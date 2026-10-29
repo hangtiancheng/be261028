@@ -1,4 +1,4 @@
-import { LitElement } from '@yukino.js/lit-jsx';
+import { LitElement } from "@yukino.js/lit-jsx";
 
 /**
  * Component base class: disables the Shadow DOM and renders into the light DOM

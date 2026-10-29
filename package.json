@@ -1,0 +1,31 @@
+{
+  "name": "be261028",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "be261028 group-buy marketing system — Vite + Lit + @yukino.js/lit-jsx + TailwindCSS v4 + motion",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier -w ./ --experimental-cli",
+    "git:config": "git config user.name hangtiancheng && git config user.email '161043261@qq.com'",
+    "git:commit": "git add -A && git commit -m \"feat: Introduce new features\"",
+    "git:push": "pnpm git:commit && git push origin main"
+  },
+  "dependencies": {
+    "@yukino.js/lit-jsx": "0.0.1",
+    "lit": "^3.3.3",
+    "motion": "^14.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.7"
+  },
+  "packageManager": "pnpm@12.10.1"
+}

@@ -7,7 +7,7 @@
  * SUCCESS/ERROR instead).
  */
 
-import { toLocalInput } from './utils';
+import { toLocalInput } from "./utils";
 
 export interface ApiResponse<T = unknown> {
   code: string;
@@ -61,10 +61,10 @@ export interface MarketConfig {
 
 /** Marketing plan code → English label (ZJ / MJ / fixed-price buy / ZK). */
 export const MARKET_PLAN_LABELS: Record<string, string> = {
-  ZJ: 'Direct deduction',
-  MJ: 'Threshold discount',
-  N: 'Fixed-price buy',
-  ZK: 'Percentage off',
+  ZJ: "Direct deduction",
+  MJ: "Threshold discount",
+  N: "Fixed-price buy",
+  ZK: "Percentage off",
 };
 
 /**
@@ -72,15 +72,27 @@ export const MARKET_PLAN_LABELS: Record<string, string> = {
  * discount details (the DTO omits them on purpose), so an equivalent ZJ / ZK
  * expression is derived from the trial prices (original / deduction / payable).
  */
-export function deriveDiscountExpr(goods: Goods): { plan: string; expr: string; note: string } {
+export function deriveDiscountExpr(goods: Goods): {
+  plan: string;
+  expr: string;
+  note: string;
+} {
   const original = Number(goods.originalPrice) || 0;
   const pay = Number(goods.payPrice) || 0;
   const deduction = Math.max(0, original - pay);
   if (original > 0 && pay > 0 && pay < original) {
     const pct = Math.round((pay / original) * 100);
-    return { plan: 'ZJ', expr: `Direct deduction ¥${deduction.toFixed(2)}`, note: `You pay ${pct}% of the list price` };
+    return {
+      plan: "ZJ",
+      expr: `Direct deduction ¥${deduction.toFixed(2)}`,
+      note: `You pay ${pct}% of the list price`,
+    };
   }
-  return { plan: 'ZJ', expr: 'Direct deduction ¥0.00', note: 'No extra discount' };
+  return {
+    plan: "ZJ",
+    expr: "Direct deduction ¥0.00",
+    note: "No extra discount",
+  };
 }
 
 export interface LockOrderResult {
@@ -152,58 +164,64 @@ export interface ActivityUpsertBody {
   };
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<ApiResponse<T>> {
+async function request<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<ApiResponse<T>> {
   const resp = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     ...init,
   });
   if (!resp.ok) {
-    return { code: 'HTTP_ERROR', info: `HTTP ${resp.status} ${resp.statusText}` };
+    return {
+      code: "HTTP_ERROR",
+      info: `HTTP ${resp.status} ${resp.statusText}`,
+    };
   }
   return (await resp.json()) as ApiResponse<T>;
 }
 
 const post = <T>(url: string, body: unknown) =>
-  request<T>(url, { method: 'POST', body: JSON.stringify(body) });
+  request<T>(url, { method: "POST", body: JSON.stringify(body) });
 
-const get = <T>(url: string) => request<T>(url, { method: 'GET' });
+const get = <T>(url: string) => request<T>(url, { method: "GET" });
 
 /** Business error code → user-friendly English message. */
 export const ERROR_MESSAGES: Record<string, string> = {
-  '0001': 'Something went wrong on our side. Please try again later.',
-  '0002': 'Invalid or incomplete parameters. Please review and retry.',
-  '0003': 'Duplicate submission rejected.',
-  '0004': 'Nothing changed — no matching records were updated.',
-  '0005': 'Upstream service call failed. Please retry.',
-  '0006': 'Too many requests. Please wait a moment and try again.',
-  E0001: 'No discount plan is available right now.',
-  E0002: 'This item has no active group-buy campaign.',
-  E0003: 'Group-buy pricing is temporarily paused for maintenance.',
-  E0004: 'You are outside the rollout range for this campaign.',
-  E0005: 'Too late — this team just filled up.',
-  E0006: 'This team is full. Start a new one instead.',
-  E0007: 'This campaign is restricted to specific user groups.',
-  E0008: 'Team stock is exhausted. Please start a new team later.',
-  E0101: 'The campaign is not effective yet.',
-  E0102: 'Outside the campaign validity window.',
-  E0103: 'You have reached the participation limit for this campaign.',
-  E0104: 'Order not found, or it has already been refunded.',
-  E0105: 'This source/channel combination is blocked.',
-  E0106: 'Payment time is outside the team validity window.',
-  E0107: 'This order was already refunded.',
-  UN_ERROR: 'Unknown error. Please try again later.',
+  "0001": "Something went wrong on our side. Please try again later.",
+  "0002": "Invalid or incomplete parameters. Please review and retry.",
+  "0003": "Duplicate submission rejected.",
+  "0004": "Nothing changed — no matching records were updated.",
+  "0005": "Upstream service call failed. Please retry.",
+  "0006": "Too many requests. Please wait a moment and try again.",
+  E0001: "No discount plan is available right now.",
+  E0002: "This item has no active group-buy campaign.",
+  E0003: "Group-buy pricing is temporarily paused for maintenance.",
+  E0004: "You are outside the rollout range for this campaign.",
+  E0005: "Too late — this team just filled up.",
+  E0006: "This team is full. Start a new one instead.",
+  E0007: "This campaign is restricted to specific user groups.",
+  E0008: "Team stock is exhausted. Please start a new team later.",
+  E0101: "The campaign is not effective yet.",
+  E0102: "Outside the campaign validity window.",
+  E0103: "You have reached the participation limit for this campaign.",
+  E0104: "Order not found, or it has already been refunded.",
+  E0105: "This source/channel combination is blocked.",
+  E0106: "Payment time is outside the team validity window.",
+  E0107: "This order was already refunded.",
+  UN_ERROR: "Unknown error. Please try again later.",
 };
 
 export function friendlyError(code: string, info: string): string {
-  return ERROR_MESSAGES[code] ?? `${info || 'Unknown error'} (${code})`;
+  return ERROR_MESSAGES[code] ?? `${info || "Unknown error"} (${code})`;
 }
 
 export const api = {
   queryMarketConfig: (userId: string, goodsId: string) =>
-    post<MarketConfig>('/api/v1/gbm/index/query_group_buy_market_config', {
+    post<MarketConfig>("/api/v1/gbm/index/query_group_buy_market_config", {
       userId,
-      source: 's01',
-      channel: 'c01',
+      source: "s01",
+      channel: "c01",
       goodsId,
     }),
 
@@ -215,21 +233,21 @@ export const api = {
     outTradeNo: string;
     notifyUrl: string;
   }) =>
-    post<LockOrderResult>('/api/v1/gbm/trade/lock_market_pay_order', {
+    post<LockOrderResult>("/api/v1/gbm/trade/lock_market_pay_order", {
       userId: body.userId,
-      teamId: body.teamId ?? '',
+      teamId: body.teamId ?? "",
       activityId: body.activityId,
       goodsId: body.goodsId,
-      source: 's01',
-      channel: 'c01',
+      source: "s01",
+      channel: "c01",
       outTradeNo: body.outTradeNo,
-      notifyConfigVO: { notifyType: 'HTTP', notifyUrl: body.notifyUrl },
+      notifyConfigVO: { notifyType: "HTTP", notifyUrl: body.notifyUrl },
     }),
 
   settle: (userId: string, outTradeNo: string) =>
-    post<SettlementResult>('/api/v1/gbm/trade/settlement_market_pay_order', {
-      source: 's01',
-      channel: 'c01',
+    post<SettlementResult>("/api/v1/gbm/trade/settlement_market_pay_order", {
+      source: "s01",
+      channel: "c01",
       userId,
       outTradeNo,
       // The backend expects naive local "YYYY-MM-DDTHH:mm:ss" (JSONTime),
@@ -238,23 +256,26 @@ export const api = {
     }),
 
   refund: (userId: string, outTradeNo: string) =>
-    post<RefundResult>('/api/v1/gbm/trade/refund_market_pay_order', {
+    post<RefundResult>("/api/v1/gbm/trade/refund_market_pay_order", {
       userId,
       outTradeNo,
-      source: 's01',
-      channel: 'c01',
+      source: "s01",
+      channel: "c01",
     }),
 
-  adminList: () => get<AdminActivity[]>('/api/v1/admin/activity/list'),
-  adminDetail: (id: number) => get<AdminActivity>(`/api/v1/admin/activity/detail/${id}`),
+  adminList: () => get<AdminActivity[]>("/api/v1/admin/activity/list"),
+  adminDetail: (id: number) =>
+    get<AdminActivity>(`/api/v1/admin/activity/detail/${id}`),
   adminCreate: (body: ActivityUpsertBody) =>
-    post<AdminActivity>('/api/v1/admin/activity/create', body),
+    post<AdminActivity>("/api/v1/admin/activity/create", body),
   adminUpdate: (body: ActivityUpsertBody) =>
-    post<AdminActivity>('/api/v1/admin/activity/update', body),
+    post<AdminActivity>("/api/v1/admin/activity/update", body),
   adminDelete: (id: number) =>
     post<AdminActivity>(`/api/v1/admin/activity/delete/${id}`, {}),
-  adminEnable: (id: number) => post<AdminActivity>(`/api/v1/admin/activity/enable/${id}`, {}),
-  adminDisable: (id: number) => post<AdminActivity>(`/api/v1/admin/activity/disable/${id}`, {}),
+  adminEnable: (id: number) =>
+    post<AdminActivity>(`/api/v1/admin/activity/enable/${id}`, {}),
+  adminDisable: (id: number) =>
+    post<AdminActivity>(`/api/v1/admin/activity/disable/${id}`, {}),
 
   dccUpdate: (key: string, value: string) =>
     get<boolean>(

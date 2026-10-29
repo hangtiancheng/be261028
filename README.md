@@ -50,19 +50,19 @@ the external HTTP gateway:
 
 ### Technology mapping
 
-| Legacy (Java/Spring Boot)               | New (Go)                                            |
-| --------------------------------------- | --------------------------------------------------- |
-| Spring MVC controllers                  | yukino_http (gateway)                               |
-| In-process calls (monolith)             | yukino_rpc (gateway ↔ activity ↔ trade)             |
-| RabbitMQ (topic exchange)               | Kafka (`team_success` / `team_refund` topics)       |
-| MyBatis + MySQL                         | GORM (`gorm.io/gorm` + `gorm.io/driver/mysql`)      |
-| Redisson                                | go-redis/v9 (bitmaps, distributed locks, counters)  |
-| BigDecimal                              | shopspring/decimal + `types.Money`                  |
-| SnakeYAML (Spring configuration)        | goccy/go-yaml                                       |
-| Static HTML/JS/CSS pages                | Vite + Lit 3 + @yukino.js/lit-jsx + Tailwind v4 + motion (`frontend/`) |
-| DCC dynamic config (Redis pub/sub)      | `infra/dcc` (Redis pub/sub)                         |
-| Actuator + Micrometer                   | prometheus/client_golang (`/metrics`)               |
-| CompletableFuture parallel trials       | goroutines + sync.WaitGroup                         |
+| Legacy (Java/Spring Boot)          | New (Go)                                                      |
+| ---------------------------------- | ------------------------------------------------------------- |
+| Spring MVC controllers             | yukino_http (gateway)                                         |
+| In-process calls (monolith)        | yukino_rpc (gateway ↔ activity ↔ trade)                       |
+| RabbitMQ (topic exchange)          | Kafka (`team_success` / `team_refund` topics)                 |
+| MyBatis + MySQL                    | GORM (`gorm.io/gorm` + `gorm.io/driver/mysql`)                |
+| Redisson                           | go-redis/v9 (bitmaps, distributed locks, counters)            |
+| BigDecimal                         | shopspring/decimal + `types.Money`                            |
+| SnakeYAML (Spring configuration)   | goccy/go-yaml                                                 |
+| Static HTML/JS/CSS pages           | Vite + Lit 3 + @yukino.js/lit-jsx + Tailwind v4 + motion (``) |
+| DCC dynamic config (Redis pub/sub) | `infra/dcc` (Redis pub/sub)                                   |
+| Actuator + Micrometer              | prometheus/client_golang (`/metrics`)                         |
+| CompletableFuture parallel trials  | goroutines + sync.WaitGroup                                   |
 
 ---
 
@@ -87,7 +87,7 @@ be261028/
 │   ├── trade/        # trade domain: repository / lock / settlement / refund / notify / strategies
 │   ├── rpc/          # yukino_rpc server implementations + client wrappers
 │   └── gateway/      # yukino_http handlers + middleware
-├── frontend/         # standalone frontend (Vite + Lit + lit-jsx + Tailwind + motion)
+├──          # standalone frontend (Vite + Lit + lit-jsx + Tailwind + motion)
 │   ├── src/{lib,components,pages}     # api/auth/router/toast/art + login/home/admin pages
 │   └── dist/                          # pnpm build output, served statically by the gateway webDir
 ├── configs/{gateway,activity,trade}.yaml
@@ -130,7 +130,7 @@ make stop
 Ports: gateway `8091` (also /metrics, /health); activity RPC `19001` / metrics
 `19101`; trade RPC `19002` / metrics `19102`.
 
-### Frontend (standalone project `frontend/`)
+### Frontend (standalone project ``)
 
 The frontend is rebuilt as an independent Vite project: Vite + TypeScript +
 Lit 3 + `@yukino.js/lit-jsx` (JSX-style components) + TailwindCSS v4 (no
@@ -141,11 +141,11 @@ visuals (goods art, avatars) are generated programmatically in `src/lib/art.ts`.
 cd frontend
 pnpm install
 pnpm dev      # http://127.0.0.1:5173, /api proxied to the gateway on 8091
-pnpm build    # outputs frontend/dist (tsc --noEmit + vite build)
+pnpm build    # outputs dist (tsc --noEmit + vite build)
 ```
 
-In production mode the gateway serves `frontend/dist` directly
-(`service.webDir: frontend/dist` in `configs/gateway.yaml`), so the frontend
+In production mode the gateway serves `dist` directly
+(`service.webDir: dist` in `configs/gateway.yaml`), so the frontend
 and API are same-origin and no extra routing configuration is needed.
 
 Pages: `#/login` login (cookie `username`, frontend-only, parity with the
@@ -168,21 +168,21 @@ curl http://127.0.0.1:8091/health
 
 ## 4. REST API (parity with the legacy project)
 
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| POST | `/api/v1/admin/activity/create` | Create activity |
-| POST | `/api/v1/admin/activity/update` | Update activity |
-| POST | `/api/v1/admin/activity/delete/:activityId` | Delete activity |
-| GET  | `/api/v1/admin/activity/detail/:activityId` | Activity detail |
-| GET  | `/api/v1/admin/activity/list` | Activity list |
-| POST | `/api/v1/admin/activity/enable/:activityId` | Enable activity |
-| POST | `/api/v1/admin/activity/disable/:activityId` | Disable activity |
-| GET  | `/api/v1/gbm/dcc/update_config?key=&value=` | Update dynamic config |
-| POST | `/api/v1/gbm/index/query_group_buy_market_config` | Home-page marketing config (rate limited) |
-| POST | `/api/v1/gbm/trade/lock_market_pay_order` | Lock a marketing pay order |
-| POST | `/api/v1/gbm/trade/settlement_market_pay_order` | Settle a marketing pay order |
-| POST | `/api/v1/gbm/trade/refund_market_pay_order` | Refund a marketing pay order |
-| POST | `/api/v1/test/group_buy_notify` | Simulated third-party callback receiver |
+| Method | Path                                              | Description                               |
+| ------ | ------------------------------------------------- | ----------------------------------------- |
+| POST   | `/api/v1/admin/activity/create`                   | Create activity                           |
+| POST   | `/api/v1/admin/activity/update`                   | Update activity                           |
+| POST   | `/api/v1/admin/activity/delete/:activityId`       | Delete activity                           |
+| GET    | `/api/v1/admin/activity/detail/:activityId`       | Activity detail                           |
+| GET    | `/api/v1/admin/activity/list`                     | Activity list                             |
+| POST   | `/api/v1/admin/activity/enable/:activityId`       | Enable activity                           |
+| POST   | `/api/v1/admin/activity/disable/:activityId`      | Disable activity                          |
+| GET    | `/api/v1/gbm/dcc/update_config?key=&value=`       | Update dynamic config                     |
+| POST   | `/api/v1/gbm/index/query_group_buy_market_config` | Home-page marketing config (rate limited) |
+| POST   | `/api/v1/gbm/trade/lock_market_pay_order`         | Lock a marketing pay order                |
+| POST   | `/api/v1/gbm/trade/settlement_market_pay_order`   | Settle a marketing pay order              |
+| POST   | `/api/v1/gbm/trade/refund_market_pay_order`       | Refund a marketing pay order              |
+| POST   | `/api/v1/test/group_buy_notify`                   | Simulated third-party callback receiver   |
 
 > The legacy `AdminController` actually maps to `/api/v1/admin/` (the legacy
 > README claimed `/api/v1/gbm/admin/`, which never matched the code); this
@@ -193,9 +193,9 @@ the legacy Jackson + BigDecimal behavior.
 
 ### Kafka topics (replacing RabbitMQ)
 
-| Topic | Description |
-| ----- | ----------- |
-| `be261028_team_success` | Team-formed notification (published on settlement completion) |
+| Topic                   | Description                                                                 |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `be261028_team_success` | Team-formed notification (published on settlement completion)               |
 | `be261028_team_refund`  | Refund notification (published on refund; the consumer restores lock stock) |
 
 ---

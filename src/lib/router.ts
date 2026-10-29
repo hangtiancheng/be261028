@@ -12,19 +12,19 @@ export type RouteChangeListener = (path: string) => void;
 const listeners = new Set<RouteChangeListener>();
 
 export function currentPath(): string {
-  const raw = location.hash.replace(/^#/, '');
-  const path = raw || '/';
-  return path.startsWith('/') ? path : `/${path}`;
+  const raw = location.hash.replace(/^#/, "");
+  const path = raw || "/";
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
 export function navigate(to: string, opts: { replace?: boolean } = {}): void {
-  const target = `#${to.startsWith('/') ? to : `/${to}`}`;
+  const target = `#${to.startsWith("/") ? to : `/${to}`}`;
   if (location.hash === target) {
     emit();
     return;
   }
   if (opts.replace) {
-    history.replaceState(null, '', target);
+    history.replaceState(null, "", target);
     emit();
   } else {
     location.hash = target;
@@ -47,5 +47,5 @@ let started = false;
 export function startRouter(): void {
   if (started) return;
   started = true;
-  window.addEventListener('hashchange', () => emit());
+  window.addEventListener("hashchange", () => emit());
 }

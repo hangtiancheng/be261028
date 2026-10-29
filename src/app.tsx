@@ -1,10 +1,10 @@
-import { customElement, state } from '@yukino.js/lit-jsx';
-import { UiElement } from './components/base';
-import { ToastHost } from './components/toast-host';
-import { AdminPage } from './pages/admin';
-import { HomePage } from './pages/home';
-import { LoginPage } from './pages/login';
-import { currentPath, onRouteChange, startRouter } from './lib/router';
+import { customElement, state } from "@yukino.js/lit-jsx";
+import { UiElement } from "./components/base";
+import { ToastHost } from "./components/toast-host";
+import { AdminPage } from "./pages/admin";
+import { HomePage } from "./pages/home";
+import { LoginPage } from "./pages/login";
+import { currentPath, onRouteChange, startRouter } from "./lib/router";
 
 /**
  * Application root: lightweight hash-router dispatch (login / home / admin)
@@ -13,7 +13,7 @@ import { currentPath, onRouteChange, startRouter } from './lib/router';
  * hash-mode semantics described in the skill docs are implemented directly in
  * lib/router.ts as a minimal router.
  */
-@customElement('x-app')
+@customElement("x-app")
 export class App extends UiElement {
   @state() private path = currentPath();
   private unsub?: () => void;
@@ -33,9 +33,9 @@ export class App extends UiElement {
 
   render() {
     let page: unknown;
-    if (this.path.startsWith('/login')) {
+    if (this.path.startsWith("/login")) {
       page = <LoginPage />;
-    } else if (this.path.startsWith('/admin')) {
+    } else if (this.path.startsWith("/admin")) {
       page = <AdminPage />;
     } else {
       page = <HomePage />;

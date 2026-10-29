@@ -11,7 +11,7 @@ GO ?= go
 BIN_DIR := bin
 
 .PHONY: all build sign run-gateway run-activity run-trade stop \
-        tidy vet test fmt clean init-db frontend-install frontend-build frontend-dev
+        tidy vet test fmt clean init-db client-install client-build client-dev
 
 all: build
 
@@ -60,12 +60,12 @@ clean:
 init-db:
 	docker exec -i hangtiancheng-mysql-1 mysql -uroot -ppass < deployments/sql/be261028.sql
 
-# Frontend (standalone project): pnpm build produces frontend/dist, served statically by the gateway webDir
-frontend-install:
-	cd frontend && pnpm install
+# client (standalone project): pnpm build produces dist, served statically by the gateway webDir
+client-install:
+	pnpm install
 
-frontend-build:
-	cd frontend && pnpm install --frozen-lockfile && pnpm build
+client-build:
+	pnpm install --frozen-lockfile && pnpm build
 
-frontend-dev:
-	cd frontend && pnpm dev
+client-dev:
+	pnpm dev

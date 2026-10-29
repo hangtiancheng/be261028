@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 // be261028 frontend build configuration:
 // - JSX is compiled with the @yukino.js/lit-jsx automatic runtime (esbuild).
@@ -9,21 +9,21 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [tailwindcss()],
   esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: '@yukino.js/lit-jsx',
+    jsx: "automatic",
+    jsxImportSource: "@yukino.js/lit-jsx",
   },
   server: {
-    host: '127.0.0.1',
+    host: "127.0.0.1",
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8091',
+      "/api": {
+        target: "http://127.0.0.1:8091",
         changeOrigin: true,
       },
     },
   },
   build: {
-    outDir: 'dist',
-    target: 'es2022',
+    outDir: "dist",
+    target: "es2022",
   },
 });

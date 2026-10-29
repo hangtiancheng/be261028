@@ -1,8 +1,8 @@
 # be261028 gateway service configuration
 service:
   name: gateway
-  httpAddr: "127.0.0.1:8091"   # public HTTP port (same as the legacy project); /metrics and /health share it
-  webDir: "frontend/dist"       # build output of the new frontend (Vite+Lit+lit-jsx+Tailwind), relative to the working directory
+  httpAddr: "127.0.0.1:8091" # public HTTP port (same as the legacy project); /metrics and /health share it
+  webDir: "dist" # build output of the new frontend (Vite+Lit+lit-jsx+Tailwind), relative to the working directory
 
 rpc:
   activityTarget: "127.0.0.1:19001"

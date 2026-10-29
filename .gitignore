@@ -10,11 +10,10 @@
 # macOS
 .DS_Store
 # Frontend (independent project)
-/frontend/node_modules/
-/frontend/dist/
+node_modules/
+dist/
 # Tool caches
 .claude/
-.mypy_cache/
 *.pid
 
 # Legacy reference project (source of the migration; separate repo, not part of be261028)

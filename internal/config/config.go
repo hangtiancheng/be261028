@@ -27,7 +27,7 @@ type ServiceConfig struct {
 	HTTPAddr    string `yaml:"httpAddr"`
 	RPCAddr     string `yaml:"rpcAddr"`
 	MetricsAddr string `yaml:"metricsAddr"`
-	// WebDir is the static frontend directory served by the gateway (relative to
+	// WebDir is the static directory served by the gateway (relative to
 	// the working directory). Empty disables static serving.
 	WebDir string `yaml:"webDir"`
 }

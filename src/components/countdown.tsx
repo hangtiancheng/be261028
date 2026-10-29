@@ -1,15 +1,21 @@
-import { customElement, property, state } from '@yukino.js/lit-jsx';
-import type { PropertyValues } from 'lit';
-import { animate } from 'motion';
-import { fromSeconds, fmtCountdown, parseCountdown, parseTime, type Countdown } from '../lib/utils';
-import { UiElement } from './base';
+import { customElement, property, state } from "@yukino.js/lit-jsx";
+import type { PropertyValues } from "lit";
+import { animate } from "motion";
+import {
+  fromSeconds,
+  fmtCountdown,
+  parseCountdown,
+  parseTime,
+  type Countdown,
+} from "../lib/utils";
+import { UiElement } from "./base";
 
 /**
  * Live countdown: prefers the absolute endTime when available; otherwise
  * decrements from the initial "HH:MM:SS" string as wall time passes.
  * Turns red within the last 60 seconds with a subtle per-tick motion pulse.
  */
-@customElement('x-countdown')
+@customElement("x-countdown")
 export class CountDown extends UiElement {
   @property({ attribute: false }) endTime: string | null = null;
   @property({ attribute: false }) initial: string | null = null;
@@ -33,7 +39,7 @@ export class CountDown extends UiElement {
   protected override updated(changed: PropertyValues<this>): void {
     // Re-anchor the wall-clock baseline whenever a refreshed team list hands
     // us a new endTime / countdown string, so silent polls can correct drift.
-    if (changed.has('endTime') || changed.has('initial')) {
+    if (changed.has("endTime") || changed.has("initial")) {
       this.baseTotal = -1;
       this.recalc();
     }
@@ -53,19 +59,21 @@ export class CountDown extends UiElement {
       this.cd = fromSeconds(this.baseTotal - (Date.now() - this.baseAt) / 1000);
     }
     if (!this.cd.ended && this.cd.total < 60 && this.cd.total !== prev) {
-      animate(this, { scale: [1.06, 1] }, { duration: 0.24, ease: 'easeOut' });
+      animate(this, { scale: [1.06, 1] }, { duration: 0.24, ease: "easeOut" });
     }
   }
 
   render() {
     if (this.cd.ended) {
-      return <span className="text-[11px] font-medium text-zinc-300">Ended</span>;
+      return (
+        <span className="text-[11px] font-medium text-zinc-300">Ended</span>
+      );
     }
     const urgent = this.cd.total < 60;
     return (
       <span
         className={`font-mono text-[11px] font-semibold tabular-nums ${
-          urgent ? 'animate-pulse text-brand-600' : 'text-zinc-400'
+          urgent ? "animate-pulse text-brand-600" : "text-zinc-400"
         }`}
       >
         {fmtCountdown(this.cd)}

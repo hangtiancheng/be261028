@@ -1,6 +1,6 @@
 /** Global toasts: module-level store rendered by <x-toast-host>; motion handles the enter/leave animations. */
 
-export type ToastKind = 'success' | 'error' | 'info';
+export type ToastKind = "success" | "error" | "info";
 
 export interface ToastItem {
   id: number;
@@ -46,7 +46,7 @@ function push(kind: ToastKind, message: string, duration = 2600): number {
 }
 
 export const toast = {
-  success: (msg: string) => push('success', msg),
-  error: (msg: string) => push('error', msg, 3200),
-  info: (msg: string) => push('info', msg),
+  success: (msg: string) => push("success", msg),
+  error: (msg: string) => push("error", msg, 3200),
+  info: (msg: string) => push("info", msg),
 };

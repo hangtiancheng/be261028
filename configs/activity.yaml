@@ -1,8 +1,8 @@
 # be261028 activity service configuration
 service:
   name: activity
-  rpcAddr: "127.0.0.1:19001"      # yukino_rpc listen address
-  metricsAddr: "127.0.0.1:19101"  # Prometheus /metrics and /health
+  rpcAddr: "127.0.0.1:19001" # yukino_rpc listen address
+  metricsAddr: "127.0.0.1:19101" # Prometheus /metrics and /health
 
 rpc:
   timeout: 5s
@@ -15,7 +15,7 @@ mysql:
   database: "be261028"
   maxOpenConns: 15
   maxIdleConns: 5
-  locName: "Asia/Shanghai"   # matches the MySQL container TZ so time comparisons are correct
+  locName: "Asia/Shanghai" # matches the MySQL container TZ so time comparisons are correct
 
 redis:
   addr: "127.0.0.1:6379"
@@ -26,10 +26,10 @@ redis:
 dcc:
   topic: "be261028_dynamic_config_center"
   defaults:
-    downgradeSwitch: "0"   # downgrade switch: 0 = off, 1 = on
-    cutRange: "100"        # traffic cut-over percentage, 0-100
-    scBlacklist: "s02c02"  # channel blacklist (source+channel, comma-separated)
-    cacheSwitch: "0"       # cache switch: 0 = enabled, 1 = disabled
+    downgradeSwitch: "0" # downgrade switch: 0 = off, 1 = on
+    cutRange: "100" # traffic cut-over percentage, 0-100
+    scBlacklist: "s02c02" # channel blacklist (source+channel, comma-separated)
+    cacheSwitch: "0" # cache switch: 0 = enabled, 1 = disabled
 
 log:
   level: "info"

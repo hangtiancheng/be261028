@@ -255,7 +255,7 @@ VALUES (1,'s01','c01','9890001','Handwritten MyBatis: A Progressive Source-Code 
 
 -- ------------------------------------------------------------
 -- Demo data: two-person team activity (goodsId=9890002, used to showcase the
--- team list). The frontend home page can load it via /?goodsId=9890002; the
+-- team list). The home page can load it via /?goodsId=9890002; the
 -- default goods remains 9890001.
 -- ------------------------------------------------------------
 INSERT INTO `group_buy_discount` (`id`, `discount_id`, `discount_name`, `discount_desc`, `discount_type`, `market_plan`, `market_expr`, `tag_id`, `create_time`, `update_time`)

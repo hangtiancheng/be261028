@@ -33,5 +33,5 @@ export const ICONS = {
 
 /** Injects a class attribute into the leading <svg> tag of an icon string. */
 export function svgIcon(svg: string, className: string): string {
-  return svg.replace('<svg ', `<svg class="${className}" `);
+  return svg.replace("<svg ", `<svg class="${className}" `);
 }

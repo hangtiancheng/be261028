@@ -42,7 +42,7 @@ func TestLoadGatewayConfigAppliesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load gateway config: %v", err)
 	}
-	if cfg.Service.WebDir != "frontend/dist" {
+	if cfg.Service.WebDir != "dist" {
 		t.Fatalf("webDir = %q", cfg.Service.WebDir)
 	}
 	if cfg.Kafka.TopicTeamSuccess != "be261028_team_success" {

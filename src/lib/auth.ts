@@ -2,11 +2,11 @@
 
 export function getUsername(): string | null {
   const match = document.cookie
-    .split(';')
+    .split(";")
     .map((c) => c.trim())
-    .find((c) => c.startsWith('username='));
+    .find((c) => c.startsWith("username="));
   if (!match) return null;
-  const value = decodeURIComponent(match.slice('username='.length));
+  const value = decodeURIComponent(match.slice("username=".length));
   return value || null;
 }
 
@@ -17,5 +17,5 @@ export function setUsername(username: string): void {
 }
 
 export function clearUsername(): void {
-  document.cookie = 'username=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  document.cookie = "username=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
 }

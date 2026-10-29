@@ -1,10 +1,16 @@
-import { createRef, customElement, property, state, type Ref } from '@yukino.js/lit-jsx';
-import type { PropertyValues } from 'lit';
-import { animate } from 'motion';
-import { UiElement } from './base';
+import {
+  createRef,
+  customElement,
+  property,
+  state,
+  type Ref,
+} from "@yukino.js/lit-jsx";
+import type { PropertyValues } from "lit";
+import { animate } from "motion";
+import { UiElement } from "./base";
 
 /** Product artwork carousel: autoplay + indicator dots + motion spring sliding; pauses on hover. */
-@customElement('x-carousel')
+@customElement("x-carousel")
 export class Carousel extends UiElement {
   @property({ attribute: false }) images: string[] = [];
 
@@ -30,11 +36,15 @@ export class Carousel extends UiElement {
   protected override updated(changed: PropertyValues<this>): void {
     // Keep the slide index (and the track offset) valid when the images swap,
     // e.g. after the home page switches goods in place.
-    if (changed.has('images')) {
+    if (changed.has("images")) {
       if (this.index >= this.images.length) this.index = 0;
       const el = this.trackRef.value;
       if (el) {
-        animate(el, { x: `${-this.index * 100}%` }, { type: 'spring', stiffness: 220, damping: 28 });
+        animate(
+          el,
+          { x: `${-this.index * 100}%` },
+          { type: "spring", stiffness: 220, damping: 28 },
+        );
       }
     }
   }
@@ -43,7 +53,11 @@ export class Carousel extends UiElement {
     this.index = i;
     const el = this.trackRef.value;
     if (el) {
-      animate(el, { x: `${-i * 100}%` }, { type: 'spring', stiffness: 220, damping: 28 });
+      animate(
+        el,
+        { x: `${-i * 100}%` },
+        { type: "spring", stiffness: 220, damping: 28 },
+      );
     }
   }
 
@@ -62,7 +76,12 @@ export class Carousel extends UiElement {
           {this.images.map((src) => (
             <div className="w-full shrink-0">
               {/* Generated on canvas (data URI) — never an image file. */}
-              <img src={src} alt="Generated product artwork" loading="lazy" className="aspect-square w-full object-cover" />
+              <img
+                src={src}
+                alt="Generated product artwork"
+                loading="lazy"
+                className="aspect-square w-full object-cover"
+              />
             </div>
           ))}
         </div>
@@ -72,7 +91,7 @@ export class Carousel extends UiElement {
               onClick={() => this.go(i)}
               aria-label={`Go to slide ${i + 1}`}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === this.index ? 'w-5 bg-white' : 'w-1.5 bg-white/60'
+                i === this.index ? "w-5 bg-white" : "w-1.5 bg-white/60"
               }`}
             />
           ))}

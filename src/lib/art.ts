@@ -41,16 +41,18 @@ function memoize(fn: (key: string) => string): (key: string) => string {
   };
 }
 
-function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
-  const canvas = document.createElement('canvas');
+function makeCanvas(
+  size: number,
+): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  return [canvas, canvas.getContext('2d')!];
+  return [canvas, canvas.getContext("2d")!];
 }
 
-type Shape = 'round' | 'circle' | 'ring' | 'triangle' | 'diamond';
+type Shape = "round" | "circle" | "ring" | "triangle" | "diamond";
 
-const SHAPES: Shape[] = ['round', 'circle', 'ring', 'triangle', 'diamond'];
+const SHAPES: Shape[] = ["round", "circle", "ring", "triangle", "diamond"];
 
 function drawShape(
   ctx: CanvasRenderingContext2D,
@@ -61,27 +63,27 @@ function drawShape(
 ): void {
   ctx.beginPath();
   switch (shape) {
-    case 'round':
+    case "round":
       ctx.roundRect(x, y, s, s, s * 0.32);
       ctx.fill();
       break;
-    case 'circle':
+    case "circle":
       ctx.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'ring':
+    case "ring":
       ctx.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2);
       ctx.lineWidth = s * 0.18;
       ctx.stroke();
       break;
-    case 'triangle':
+    case "triangle":
       ctx.moveTo(x + s / 2, y);
       ctx.lineTo(x + s, y + s);
       ctx.lineTo(x, y + s);
       ctx.closePath();
       ctx.fill();
       break;
-    case 'diamond':
+    case "diamond":
       ctx.moveTo(x + s / 2, y);
       ctx.lineTo(x + s, y + s / 2);
       ctx.lineTo(x + s / 2, y + s);
@@ -119,8 +121,11 @@ export const genProductArt = memoize((seed: string): string => {
     const cy = rand() * SIZE;
     const r = SIZE * (0.2 + rand() * 0.32);
     const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    glow.addColorStop(0, `hsla(${(hue2 + i * 36) % 360}, 96%, 78%, ${(0.14 + rand() * 0.14).toFixed(3)})`);
-    glow.addColorStop(1, 'hsla(0, 0%, 100%, 0)');
+    glow.addColorStop(
+      0,
+      `hsla(${(hue2 + i * 36) % 360}, 96%, 78%, ${(0.14 + rand() * 0.14).toFixed(3)})`,
+    );
+    glow.addColorStop(1, "hsla(0, 0%, 100%, 0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, SIZE, SIZE);
   }
@@ -134,7 +139,10 @@ export const genProductArt = memoize((seed: string): string => {
       const shape = SHAPES[Math.floor(rand() * SHAPES.length)];
       const pad = CELL * (0.12 + rand() * 0.14);
       const alpha = 0.1 + rand() * 0.24;
-      const tone = rand() < 0.22 ? `hsla(${hue}, 70%, 22%, ${(alpha + 0.08).toFixed(3)})` : `hsla(0, 0%, 100%, ${alpha.toFixed(3)})`;
+      const tone =
+        rand() < 0.22
+          ? `hsla(${hue}, 70%, 22%, ${(alpha + 0.08).toFixed(3)})`
+          : `hsla(0, 0%, 100%, ${alpha.toFixed(3)})`;
       ctx.fillStyle = tone;
       ctx.strokeStyle = tone;
       const s = CELL - pad * 2;
@@ -148,24 +156,24 @@ export const genProductArt = memoize((seed: string): string => {
 
   // Center badge: concentric ring + solid dot to anchor the visual focus.
   const c = SIZE / 2;
-  ctx.strokeStyle = 'hsla(0, 0%, 100%, 0.5)';
+  ctx.strokeStyle = "hsla(0, 0%, 100%, 0.5)";
   ctx.lineWidth = SIZE * 0.014;
   ctx.beginPath();
   ctx.arc(c, c, SIZE * 0.2, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.fillStyle = 'hsla(0, 0%, 100%, 0.16)';
+  ctx.fillStyle = "hsla(0, 0%, 100%, 0.16)";
   ctx.beginPath();
   ctx.arc(c, c, SIZE * 0.15, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'hsla(0, 0%, 100%, 0.85)';
+  ctx.fillStyle = "hsla(0, 0%, 100%, 0.85)";
   ctx.beginPath();
   ctx.arc(c, c, SIZE * 0.035, 0, Math.PI * 2);
   ctx.fill();
 
   // Top sheen fade for a poster-like finish.
   const sheen = ctx.createLinearGradient(0, 0, 0, SIZE * 0.5);
-  sheen.addColorStop(0, 'hsla(0, 0%, 100%, 0.14)');
-  sheen.addColorStop(1, 'hsla(0, 0%, 100%, 0)');
+  sheen.addColorStop(0, "hsla(0, 0%, 100%, 0.14)");
+  sheen.addColorStop(1, "hsla(0, 0%, 100%, 0)");
   ctx.fillStyle = sheen;
   ctx.fillRect(0, 0, SIZE, SIZE * 0.5);
 
@@ -203,18 +211,35 @@ export const genAvatarArt = memoize((seed: string): string => {
       if (rand() >= 0.55) continue;
       ctx.fillStyle = `hsla(0, 0%, 100%, ${(0.16 + rand() * 0.3).toFixed(3)})`;
       const pad = CELL * 0.12;
-      ctx.fillRect(col * CELL + pad, row * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+      ctx.fillRect(
+        col * CELL + pad,
+        row * CELL + pad,
+        CELL - pad * 2,
+        CELL - pad * 2,
+      );
       const mirrorCol = GRID - 1 - col;
       if (mirrorCol !== col) {
-        ctx.fillRect(mirrorCol * CELL + pad, row * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+        ctx.fillRect(
+          mirrorCol * CELL + pad,
+          row * CELL + pad,
+          CELL - pad * 2,
+          CELL - pad * 2,
+        );
       }
     }
   }
 
   // Subtle top-left highlight for depth.
-  const sheen = ctx.createRadialGradient(SIZE * 0.3, SIZE * 0.25, 0, SIZE * 0.3, SIZE * 0.25, SIZE * 0.75);
-  sheen.addColorStop(0, 'hsla(0, 0%, 100%, 0.22)');
-  sheen.addColorStop(1, 'hsla(0, 0%, 100%, 0)');
+  const sheen = ctx.createRadialGradient(
+    SIZE * 0.3,
+    SIZE * 0.25,
+    0,
+    SIZE * 0.3,
+    SIZE * 0.25,
+    SIZE * 0.75,
+  );
+  sheen.addColorStop(0, "hsla(0, 0%, 100%, 0.22)");
+  sheen.addColorStop(1, "hsla(0, 0%, 100%, 0)");
   ctx.fillStyle = sheen;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
@@ -235,8 +260,8 @@ export const genQrArt = memoize((seed: string): string => {
   const [canvas, ctx] = makeCanvas(SIZE);
   const rand = xorShift32(fnv1a(`qr:${seed}`));
 
-  const DARK = '#18181b';
-  ctx.fillStyle = '#ffffff';
+  const DARK = "#18181b";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, SIZE, SIZE);
   ctx.fillStyle = DARK;
 
@@ -264,11 +289,26 @@ export const genQrArt = memoize((seed: string): string => {
   // The three finder patterns.
   const finder = (topRow: number, leftCol: number): void => {
     ctx.fillStyle = DARK;
-    ctx.fillRect((QUIET + leftCol) * CELL, (QUIET + topRow) * CELL, CELL * 7, CELL * 7);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect((QUIET + leftCol + 1) * CELL, (QUIET + topRow + 1) * CELL, CELL * 5, CELL * 5);
+    ctx.fillRect(
+      (QUIET + leftCol) * CELL,
+      (QUIET + topRow) * CELL,
+      CELL * 7,
+      CELL * 7,
+    );
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(
+      (QUIET + leftCol + 1) * CELL,
+      (QUIET + topRow + 1) * CELL,
+      CELL * 5,
+      CELL * 5,
+    );
     ctx.fillStyle = DARK;
-    ctx.fillRect((QUIET + leftCol + 2) * CELL, (QUIET + topRow + 2) * CELL, CELL * 3, CELL * 3);
+    ctx.fillRect(
+      (QUIET + leftCol + 2) * CELL,
+      (QUIET + topRow + 2) * CELL,
+      CELL * 3,
+      CELL * 3,
+    );
   };
   finder(0, 0);
   finder(0, MODULES - 7);
