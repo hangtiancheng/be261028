@@ -12,7 +12,7 @@ import {
 import { genAvatarArt, genProductArt, genQrArt } from '../lib/art';
 import { clearUsername, getUsername } from '../lib/auth';
 import { ICONS, svgIcon } from '../lib/icons';
-import { navigate } from '../lib/router';
+import { navigate, onRouteChange } from '../lib/router';
 import { toast } from '../lib/toast';
 import { fmtPrice, newOutTradeNo, parseTime } from '../lib/utils';
 import { UiElement } from '../components/base';
@@ -35,12 +35,17 @@ const PRODUCT_TITLES: Record<string, string> = {
  */
 const POLL_INTERVAL_MS = 3000;
 
-/** Supports ?goodsId=<id> (defaults to 9890001); also tolerates a query inside the hash. */
+/**
+ * Supports ?goodsId=<id> (defaults to 9890001). The hash query wins over the
+ * search query so the goods switcher can navigate within the SPA without a
+ * stale location.search overriding the selection.
+ */
 function resolveGoodsId(): string {
-  let q = new URLSearchParams(location.search).get('goodsId');
-  if (!q && location.hash.includes('?')) {
+  let q: string | null = null;
+  if (location.hash.includes('?')) {
     q = new URLSearchParams(location.hash.slice(location.hash.indexOf('?'))).get('goodsId');
   }
+  if (!q) q = new URLSearchParams(location.search).get('goodsId');
   return q && q.trim() ? q.trim() : DEFAULT_GOODS_ID;
 }
 
@@ -53,18 +58,21 @@ export class HomePage extends UiElement {
   @state() private payOpen = false;
   @state() private paying = false;
   @state() private locking = false;
+  /** Solo ("buy alone") payment: simulated list-price payment, no group order. */
+  @state() private paySolo = false;
   @state() private payAmount = '0.00';
   @state() private payOutTradeNo = '';
   @state() private pendingOutTradeNo = '';
   @state() private settledOutTradeNo = '';
+  @state() private goodsId: string = resolveGoodsId();
+  /** Carousel artwork: generated on canvas from a goodsId-derived seed; no image files. */
+  @state() private carouselImages: string[] = [0, 1, 2].map((i) => genProductArt(`${resolveGoodsId()}-${i}`));
 
   private overlayRef: Ref<HTMLDivElement> = createRef();
   private panelRef: Ref<HTMLDivElement> = createRef();
   private animatedCards = new WeakSet<Element>();
   private me: string | null = getUsername();
-  private readonly goodsId: string = resolveGoodsId();
-  /** Carousel artwork: generated on canvas from a goodsId-derived seed; no image files. */
-  private readonly carouselImages: string[] = [0, 1, 2].map((i) => genProductArt(`${this.goodsId}-${i}`));
+  private routeUnsub?: () => void;
 
   private pollTimer?: number;
   private inFlight = false;
@@ -130,6 +138,12 @@ export class HomePage extends UiElement {
       navigate('/login', { replace: true });
       return;
     }
+    // In-app goods switching: the switcher navigates the hash query, and the
+    // route listener swaps the goods without a full page reload.
+    this.routeUnsub = onRouteChange(() => {
+      const id = resolveGoodsId();
+      if (id !== this.goodsId) this.applyGoods(id);
+    });
     void this.load(false);
     // Silent background refresh so team seats and countdowns stay current.
     this.pollTimer = window.setInterval(() => {
@@ -148,6 +162,17 @@ export class HomePage extends UiElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this.pollTimer !== undefined) window.clearInterval(this.pollTimer);
+    this.routeUnsub?.();
+  }
+
+  /** Swaps the active goods in place (hash-query driven; no page reload). */
+  private applyGoods(id: string): void {
+    this.goodsId = id;
+    this.carouselImages = [0, 1, 2].map((i) => genProductArt(`${id}-${i}`));
+    this.data = null;
+    this.errorMsg = '';
+    this.animatedCards = new WeakSet<Element>();
+    void this.load(false);
   }
 
   private async load(silent: boolean, retryOnRateLimit = true): Promise<void> {
@@ -212,9 +237,9 @@ export class HomePage extends UiElement {
 
   private switchGoods(id: string): void {
     if (id === this.goodsId) return;
-    const url = new URL(location.href);
-    url.search = `?goodsId=${id}`;
-    location.href = url.toString();
+    // Always carry the goodsId in the hash query so it wins over any stale
+    // ?goodsId= in location.search (see resolveGoodsId).
+    navigate(`/?goodsId=${id}`);
   }
 
   /** Start a team / join one: if I am already in a team, resume my own order (idempotent, parity with legacy). */
@@ -222,14 +247,16 @@ export class HomePage extends UiElement {
     if (!this.data || this.locking) return;
     const own = this.ownTeam;
     if (own) {
-      // Team entries may carry an empty outTradeNo (the gateway omits it), so
-      // fall back to the locally persisted pending/settled trade numbers.
+      // Owner team entries carry outTradeNo; random-sampled entries of other
+      // users do not. Fall back to the locally persisted pending trade number.
       const resumeNo = own.outTradeNo || this.pendingOutTradeNo;
-      if (resumeNo) {
+      if (resumeNo && resumeNo === this.settledOutTradeNo) {
+        // The seat is already paid — reopening the cashier would only produce
+        // a duplicate-settlement error, so explain instead.
+        toast.info('You already paid for your seat in this campaign');
+      } else if (resumeNo) {
         this.savePending(resumeNo);
         this.openPay(fmtPrice(this.data.goods.payPrice), resumeNo);
-      } else if (this.settledOutTradeNo) {
-        toast.info('You already paid for your seat in this campaign');
       } else {
         toast.info('You already have a seat in this campaign');
       }
@@ -261,6 +288,18 @@ export class HomePage extends UiElement {
     this.locking = false;
   }
 
+  /**
+   * "Buy alone" (legacy parity): shows the cashier at the list price without
+   * creating a group order — the backend has no solo-purchase API, so the
+   * payment is simulated locally (the legacy page behaved the same way: modal
+   * only, no lock_market_pay_order call).
+   */
+  private buyAlone(): void {
+    if (!this.data || this.locking) return;
+    this.paySolo = true;
+    this.openPay(fmtPrice(this.data.goods.originalPrice), '');
+  }
+
   private openPay(amount: string, outTradeNo: string): void {
     this.payAmount = amount;
     this.payOutTradeNo = outTradeNo;
@@ -284,6 +323,7 @@ export class HomePage extends UiElement {
     const panel = this.panelRef.value;
     const done = () => {
       this.payOpen = false;
+      this.paySolo = false;
     };
     if (!overlay || !panel) {
       done();
@@ -303,6 +343,12 @@ export class HomePage extends UiElement {
 
   private async confirmPay(): Promise<void> {
     if (this.paying) return;
+    if (this.paySolo) {
+      // Simulated list-price purchase: no group order exists to settle.
+      toast.success('Solo purchase completed (simulated)');
+      this.closePay();
+      return;
+    }
     this.paying = true;
     try {
       const res = await api.settle(this.me!, this.payOutTradeNo);
@@ -464,7 +510,7 @@ export class HomePage extends UiElement {
                     {/* Desktop purchase actions (mobile uses the fixed bottom bar) */}
                     <div className="mt-5 hidden gap-3 lg:flex">
                       <button
-                        onClick={() => void this.startOrJoin()}
+                        onClick={() => this.buyAlone()}
                         disabled={this.locking}
                         className="flex-1 rounded-2xl border-2 border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-600 transition hover:border-brand-200 active:scale-[.98] disabled:opacity-60"
                       >
@@ -574,7 +620,7 @@ export class HomePage extends UiElement {
             <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md border-t border-zinc-200/60 bg-white/90 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-3 backdrop-blur lg:hidden">
               <div className="mx-auto flex w-full gap-3">
                 <button
-                  onClick={() => void this.startOrJoin()}
+                  onClick={() => this.buyAlone()}
                   disabled={this.locking}
                   className="flex-1 rounded-2xl border-2 border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-600 transition active:scale-[.98] disabled:opacity-60"
                 >
@@ -611,12 +657,14 @@ export class HomePage extends UiElement {
                   </div>
                   {/* Simulated payment QR: canvas-generated from the trade number; not an image file. */}
                   <img
-                    src={genQrArt(this.payOutTradeNo || 'be261028-pay')}
+                    src={genQrArt(
+                      this.paySolo ? `solo-${this.goodsId}-${this.me}` : this.payOutTradeNo || 'be261028-pay',
+                    )}
                     alt="Simulated payment QR code"
                     className="mx-auto mt-4 h-44 w-44 rounded-2xl border border-zinc-100 object-contain"
                   />
                   <p className="mt-3 text-center font-mono text-[11px] text-zinc-400">
-                    Trade no. {this.payOutTradeNo}
+                    {this.paySolo ? 'Solo purchase · no group order' : `Trade no. ${this.payOutTradeNo}`}
                   </p>
                   <div className="mt-5 flex gap-3">
                     <button
@@ -658,9 +706,10 @@ export class HomePage extends UiElement {
     const remaining = Math.max(0, t.targetCount - t.lockCount);
     const pct = Math.min(100, Math.round((t.completeCount / Math.max(1, t.targetCount)) * 100));
     const mine = t.userId === this.me;
-    // The gateway currently sends an empty outTradeNo on team entries, so the
-    // locally persisted settled trade number is the refund handle for leaders;
-    // t.outTradeNo is preferred when a future backend populates it.
+    // Owner entries carry outTradeNo (the refund handle); random-sampled
+    // entries of other users omit it. The locally persisted settled trade
+    // number is the fallback for teams that already completed and left the
+    // in-progress list (e.g. the target-1 demo campaign).
     const refundNo = mine ? (t.outTradeNo || this.settledOutTradeNo) : '';
     return (
       <div className="team-card flex items-center justify-between gap-3 rounded-2xl bg-white p-3.5 shadow-sm">

@@ -1,4 +1,5 @@
 import { createRef, customElement, property, state, type Ref } from '@yukino.js/lit-jsx';
+import type { PropertyValues } from 'lit';
 import { animate } from 'motion';
 import { UiElement } from './base';
 
@@ -24,6 +25,18 @@ export class Carousel extends UiElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this.timer !== undefined) window.clearInterval(this.timer);
+  }
+
+  protected override updated(changed: PropertyValues<this>): void {
+    // Keep the slide index (and the track offset) valid when the images swap,
+    // e.g. after the home page switches goods in place.
+    if (changed.has('images')) {
+      if (this.index >= this.images.length) this.index = 0;
+      const el = this.trackRef.value;
+      if (el) {
+        animate(el, { x: `${-this.index * 100}%` }, { type: 'spring', stiffness: 220, damping: 28 });
+      }
+    }
   }
 
   private go(i: number): void {

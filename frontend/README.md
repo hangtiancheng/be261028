@@ -103,8 +103,13 @@ frontend and the API share one origin and no proxy is needed. After changing
   legacy `RateLimiterAccessInterceptor`): on code `0006` the home page backs
   off ~1.1 s and retries once instead of rendering the limiter as an error,
   and background polling never runs faster than every 3 s.
-- The home page supports `?goodsId=<id>` to override the default goods
-  `9890001`; in the seed data `9890002` maps to the two-person campaign
-  `300001`, which exercises the team list / join flow.
-- External trade numbers are generated per attempt as
-  `OTN-<timestamp>-<random digits>`.
+- The home page supports `?goodsId=<id>` (search or hash query) to override
+  the default goods `9890001`; in the seed data `9890002` maps to the
+  two-person campaign `300001`, which exercises the team list / join flow.
+  The desktop goods switcher swaps goods in place via the hash router (no
+  page reload).
+- External trade numbers are 12 random digits per attempt (parity with the
+  legacy `generateRandomNumber(12)`).
+- "Buy solo" mirrors the legacy `单独购买` button: it opens the cashier at the
+  list price as a simulated payment — the backend has no solo-purchase API,
+  so no lock/settlement call is made.

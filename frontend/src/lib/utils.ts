@@ -9,9 +9,12 @@ export function randomNumeric(n = 12): string {
   return s;
 }
 
-/** Unique external trade number per attempt: OTN-<timestamp>-<rand>. */
+/**
+ * External trade number per attempt: 12 random digits — parity with the
+ * legacy `generateRandomNumber(12)` used by lock_market_pay_order.
+ */
 export function newOutTradeNo(): string {
-  return `OTN-${Date.now()}-${randomNumeric(6)}`;
+  return randomNumeric(12);
 }
 
 /** Money formatting: always two decimal places. */

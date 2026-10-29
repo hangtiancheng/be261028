@@ -1,4 +1,5 @@
 import { customElement, property, state } from '@yukino.js/lit-jsx';
+import type { PropertyValues } from 'lit';
 import { animate } from 'motion';
 import { fromSeconds, fmtCountdown, parseCountdown, parseTime, type Countdown } from '../lib/utils';
 import { UiElement } from './base';
@@ -27,6 +28,15 @@ export class CountDown extends UiElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this.timer !== undefined) window.clearInterval(this.timer);
+  }
+
+  protected override updated(changed: PropertyValues<this>): void {
+    // Re-anchor the wall-clock baseline whenever a refreshed team list hands
+    // us a new endTime / countdown string, so silent polls can correct drift.
+    if (changed.has('endTime') || changed.has('initial')) {
+      this.baseTotal = -1;
+      this.recalc();
+    }
   }
 
   private recalc(): void {
