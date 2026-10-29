@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* 品牌主题令牌（Tailwind v4 CSS-first 配置，非手写样式规则） */
+@theme {
+  --color-brand-50: oklch(0.969 0.015 12.422);
+  --color-brand-100: oklch(0.941 0.03 12.422);
+  --color-brand-200: oklch(0.892 0.058 12.422);
+  --color-brand-300: oklch(0.824 0.092 12.422);
+  --color-brand-400: oklch(0.741 0.142 12.422);
+  --color-brand-500: oklch(0.665 0.19 12.422);
+  --color-brand-600: oklch(0.586 0.213 12.422);
+  --color-brand-700: oklch(0.493 0.198 12.422);
+  --color-brand-800: oklch(0.413 0.164 12.422);
+  --color-brand-900: oklch(0.358 0.135 12.422);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}

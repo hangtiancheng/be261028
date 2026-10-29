@@ -1,0 +1,35 @@
+# be261028 activity 服务配置
+service:
+  name: activity
+  rpcAddr: "127.0.0.1:19001"      # yukino_rpc 监听地址
+  metricsAddr: "127.0.0.1:19101"  # Prometheus /metrics 与 /health
+
+rpc:
+  timeout: 5s
+
+mysql:
+  host: "127.0.0.1"
+  port: 3306
+  user: "root"
+  password: "pass"
+  database: "be261028"
+  maxOpenConns: 15
+  maxIdleConns: 5
+  locName: "Asia/Shanghai"   # 与 MySQL 容器 TZ 一致，保证时间比较正确
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  poolSize: 10
+
+dcc:
+  topic: "be261028_dynamic_config_center"
+  defaults:
+    downgradeSwitch: "0"   # 降级开关 0关闭、1开启
+    cutRange: "100"        # 切量百分比 0-100
+    scBlacklist: "s02c02"  # 渠道黑名单（source+channel，逗号分隔）
+    cacheSwitch: "0"       # 缓存开关 0开启、1关闭
+
+log:
+  level: "info"

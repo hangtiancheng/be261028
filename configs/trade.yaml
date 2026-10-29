@@ -1,0 +1,52 @@
+# be261028 trade 服务配置
+service:
+  name: trade
+  rpcAddr: "127.0.0.1:19002"      # yukino_rpc 监听地址
+  metricsAddr: "127.0.0.1:19102"  # Prometheus /metrics 与 /health
+
+rpc:
+  activityTarget: "127.0.0.1:19001"  # 锁单试算回调 activity 服务
+  timeout: 5s
+
+mysql:
+  host: "127.0.0.1"
+  port: 3306
+  user: "root"
+  password: "pass"
+  database: "be261028"
+  maxOpenConns: 15
+  maxIdleConns: 5
+  locName: "Asia/Shanghai"
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  poolSize: 10
+
+kafka:
+  brokers:
+    - "127.0.0.1:9092"
+  topicTeamSuccess: "be261028_team_success"
+  topicTeamRefund: "be261028_team_refund"
+  groupId: "be261028"
+  clientId: "be261028"
+
+dcc:
+  topic: "be261028_dynamic_config_center"
+  defaults:
+    downgradeSwitch: "0"
+    cutRange: "100"
+    scBlacklist: "s02c02"
+    cacheSwitch: "0"
+
+notify:
+  jobInterval: 20m            # 定时回调通知任务间隔（替代旧 cron 0 1/20 * * * *）
+  jobLockKey: "be261028_notify_job_exec"
+  httpLockWait: 3s
+  httpLockLease: 30s
+  callbackTimeout: 10s
+  maxRetry: 4                 # notify_count > 4 后标记失败
+
+log:
+  level: "info"
