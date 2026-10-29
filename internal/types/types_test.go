@@ -101,7 +101,7 @@ func TestGetRefundStrategy(t *testing.T) {
 }
 
 func TestGroupBuyOrderStatusOfNormalizesRefundState(t *testing.T) {
-	// db status 3 (完成含退单) normalises to Complete; the legacy valueOf threw.
+	// db status 3 (completed with refund) normalises to Complete; the legacy valueOf threw.
 	if got := GroupBuyOrderStatusOf(3); got != GroupBuyOrderComplete {
 		t.Errorf("GroupBuyOrderStatusOf(3) = %d, want Complete", got)
 	}
@@ -188,7 +188,8 @@ func TestAppError(t *testing.T) {
 		t.Errorf("AsAppError(nil) should be nil")
 	}
 
-	// 缺陷修复回归：被 fmt.Errorf("%w") 包裹的 AppError 也必须能解包出业务码。
+	// Defect-fix regression: an AppError wrapped with fmt.Errorf("%w") must still
+	// unwrap to its business code.
 	wrapped := fmt.Errorf("settlement failed: %w", NewAppError(ResponseE0002))
 	if ae := AsAppError(wrapped); ae == nil || ae.Code != "E0002" {
 		t.Errorf("AsAppError did not unwrap wrapped error: %v", wrapped)

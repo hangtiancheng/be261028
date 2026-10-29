@@ -7,7 +7,7 @@ import "testing"
 func TestIsCutRangeBoundaries(t *testing.T) {
 	users := []string{"u1", "xiaofuge", "liergou", "xfg01", "user-42", "test", "xifeiya"}
 
-	// cutRange=0 必须拦截所有用户。
+	// cutRange=0 must reject every user.
 	d := New("", map[string]string{KeyCutRange: "0"})
 	for _, u := range users {
 		if d.IsCutRange(u) {
@@ -15,7 +15,7 @@ func TestIsCutRangeBoundaries(t *testing.T) {
 		}
 	}
 
-	// cutRange=100 必须放行所有用户。
+	// cutRange=100 must admit every user.
 	d = New("", map[string]string{KeyCutRange: "100"})
 	for _, u := range users {
 		if !d.IsCutRange(u) {
@@ -23,7 +23,7 @@ func TestIsCutRangeBoundaries(t *testing.T) {
 		}
 	}
 
-	// 非数字配置回落到默认 100（与旧版一致）。
+	// A non-numeric value falls back to the default 100 (matching the legacy behavior).
 	d = New("", map[string]string{KeyCutRange: "abc"})
 	for _, u := range users {
 		if !d.IsCutRange(u) {
@@ -48,7 +48,7 @@ func TestIsCutRangePartial(t *testing.T) {
 }
 
 func TestIsSCBlackIntercept(t *testing.T) {
-	d := New("", nil) // 默认黑名单 s02c02
+	d := New("", nil) // default blacklist: s02c02
 	if !d.IsSCBlackIntercept("s02", "c02") {
 		t.Error("s02c02 should be intercepted by default")
 	}
@@ -69,7 +69,7 @@ func TestDefaultsAndOverrides(t *testing.T) {
 	if !d.IsDowngradeSwitch() {
 		t.Error("downgradeSwitch=1 should be on")
 	}
-	// cacheSwitch 默认 "0"（开启缓存，与旧版语义一致）。
+	// cacheSwitch defaults to "0" (cache open, matching the legacy semantics).
 	if !d.IsCacheOpenSwitch() {
 		t.Error("default cacheSwitch should be open")
 	}

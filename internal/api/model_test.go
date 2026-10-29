@@ -15,24 +15,25 @@ func TestDifferenceDateTime2Str(t *testing.T) {
 	}
 
 	// Ended (end before start).
-	if got := DifferenceDateTime2Str(base, base.Add(-time.Second)); got != "已结束" {
-		t.Errorf("ended countdown = %s, want 已结束", got)
+	if got := DifferenceDateTime2Str(base, base.Add(-time.Second)); got != "Ended" {
+		t.Errorf("ended countdown = %s, want Ended", got)
 	}
 
 	// Missing value.
-	if got := DifferenceDateTime2Str(time.Time{}, base); got != "无效的时间" {
-		t.Errorf("invalid countdown = %s, want 无效的时间", got)
+	if got := DifferenceDateTime2Str(time.Time{}, base); got != "Invalid time" {
+		t.Errorf("invalid countdown = %s, want Invalid time", got)
 	}
 
-	// 缺陷修复回归：超过 24 小时的倒计时必须显示天数（旧版 %24 会丢掉天）。
-	if got := DifferenceDateTime2Str(base, base.Add(25*time.Hour+2*time.Minute+3*time.Second)); got != "1天01:02:03" {
-		t.Errorf("countdown = %s, want 1天01:02:03", got)
+	// Regression guard for the defect fix: countdowns longer than 24h must show
+	// the day component (the legacy %24 dropped whole days).
+	if got := DifferenceDateTime2Str(base, base.Add(25*time.Hour+2*time.Minute+3*time.Second)); got != "1d 01:02:03" {
+		t.Errorf("countdown = %s, want 1d 01:02:03", got)
 	}
-	if got := DifferenceDateTime2Str(base, base.Add(72*time.Hour)); got != "3天00:00:00" {
-		t.Errorf("countdown = %s, want 3天00:00:00", got)
+	if got := DifferenceDateTime2Str(base, base.Add(72*time.Hour)); got != "3d 00:00:00" {
+		t.Errorf("countdown = %s, want 3d 00:00:00", got)
 	}
-	// 恰好 24 小时 = 1 天（旧版会误显示为 00:00:00，形似已结束）。
-	if got := DifferenceDateTime2Str(base, base.Add(24*time.Hour)); got != "1天00:00:00" {
-		t.Errorf("countdown = %s, want 1天00:00:00", got)
+	// Exactly 24 hours = 1 day (the legacy version mis-rendered it as 00:00:00, looking like "ended").
+	if got := DifferenceDateTime2Str(base, base.Add(24*time.Hour)); got != "1d 00:00:00" {
+		t.Errorf("countdown = %s, want 1d 00:00:00", got)
 	}
 }

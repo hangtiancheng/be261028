@@ -143,11 +143,11 @@ func (d *DCC) Subscribe(ctx context.Context, r *redisx.RedisService) {
 			}
 			var attr AttributeVO
 			if err := json.Unmarshal([]byte(msg.Payload), &attr); err != nil {
-				log.Printf("[dcc] 无法解析配置消息: %v", err)
+				log.Printf("[dcc] failed to parse config message: %v", err)
 				continue
 			}
 			d.Update(attr.Key, attr.Value)
-			log.Printf("[dcc] 动态配置更新 key:%s value:%s", attr.Key, attr.Value)
+			log.Printf("[dcc] dynamic config updated key:%s value:%s", attr.Key, attr.Value)
 		}
 	}
 }

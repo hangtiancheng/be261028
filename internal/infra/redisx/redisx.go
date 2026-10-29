@@ -89,6 +89,22 @@ func (r *RedisService) IncrBy(ctx context.Context, key string, delta int64) (int
 	return r.client.IncrBy(ctx, key, delta).Result()
 }
 
+// Decr atomically decrements key by one and returns the new value. It is used to
+// roll back a speculative Incr when a subsequent check rejects the operation.
+func (r *RedisService) Decr(ctx context.Context, key string) (int64, error) {
+	return r.client.Decr(ctx, key).Result()
+}
+
+// Expire sets a TTL on an existing key, returning whether the key existed. A
+// non-positive ttl is ignored. It is used to bound the lifetime of counters that
+// the legacy implementation left to accumulate forever.
+func (r *RedisService) Expire(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	if ttl <= 0 {
+		return false, nil
+	}
+	return r.client.Expire(ctx, key, ttl).Result()
+}
+
 // GetAtomicLong reads a counter value, returning 0 when the key is absent.
 func (r *RedisService) GetAtomicLong(ctx context.Context, key string) (int64, error) {
 	v, err := r.client.Get(ctx, key).Int64()

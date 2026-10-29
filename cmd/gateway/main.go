@@ -24,36 +24,36 @@ import (
 func main() {
 	cfg, err := bootstrap.LoadConfig(bootstrap.ConfigPath("configs/gateway.yaml"))
 	if err != nil {
-		log.Fatalf("[gateway] 加载配置失败: %v", err)
+		log.Fatalf("[gateway] failed to load config: %v", err)
 	}
-	log.Printf("[gateway] 启动服务 name:%s http:%s", cfg.Service.Name, cfg.Service.HTTPAddr)
+	log.Printf("[gateway] starting service name:%s http:%s", cfg.Service.Name, cfg.Service.HTTPAddr)
 
 	ctx := bootstrap.SignalContext()
 
-	// Redis（用于发布 DCC 动态配置）
+	// Redis (used to publish DCC dynamic-config updates).
 	redis, err := redisx.New(cfg.Redis)
 	if err != nil {
-		log.Fatalf("[gateway] 连接 Redis 失败: %v", err)
+		log.Fatalf("[gateway] failed to connect to Redis: %v", err)
 	}
 	defer redis.Close()
 	dccService := dcc.New(cfg.DCC.Topic, cfg.DCC.Defaults)
 
-	// RPC 客户端
+	// RPC clients.
 	activityConn, err := yukinorpc.Dial(cfg.RPC.ActivityTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
-		log.Fatalf("[gateway] 连接 activity 服务失败: %v", err)
+		log.Fatalf("[gateway] failed to connect to the activity service: %v", err)
 	}
 	defer activityConn.Close()
 	tradeConn, err := yukinorpc.Dial(cfg.RPC.TradeTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
-		log.Fatalf("[gateway] 连接 trade 服务失败: %v", err)
+		log.Fatalf("[gateway] failed to connect to the trade service: %v", err)
 	}
 	defer tradeConn.Close()
 
 	activityCli := rpc.NewActivityClient(activityConn)
 	tradeCli := rpc.NewTradeClient(tradeConn)
 
-	// HTTP 应用
+	// HTTP application.
 	app := yukinohttp.Default()
 	gw := gateway.New(activityCli, tradeCli, dccService, redis)
 	gw.Register(app)
@@ -66,21 +66,21 @@ func main() {
 		ReadHeaderTimeout: 15 * time.Second,
 	}
 	go func() {
-		log.Printf("[gateway] HTTP 监听 %s", cfg.Service.HTTPAddr)
+		log.Printf("[gateway] HTTP listening on %s", cfg.Service.HTTPAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[gateway] HTTP 服务异常: %v", err)
+			log.Fatalf("[gateway] HTTP server error: %v", err)
 		}
 	}()
 
-	// 等待退出信号
+	// Wait for the shutdown signal.
 	<-ctx.Done()
-	log.Printf("[gateway] 收到退出信号，开始优雅停机")
+	log.Printf("[gateway] shutdown signal received, starting graceful stop")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("[gateway] HTTP 停机异常: %v", err)
+		log.Printf("[gateway] HTTP shutdown error: %v", err)
 	}
-	log.Printf("[gateway] 已停机")
+	log.Printf("[gateway] stopped")
 }
 
 // mountOps exposes Prometheus metrics and a health probe on the main HTTP port,
@@ -88,6 +88,10 @@ func main() {
 func mountOps(app *yukinohttp.Application) {
 	promHandler := promhttp.Handler()
 	app.Get("/metrics", func(ctx *yukinohttp.Context, next func()) {
+		// TakeOver disables deferred rendering (which would otherwise promote the
+		// implicit 404 to 200). Record the real status so the access logger and
+		// metrics middleware report 200 instead of a misleading 404.
+		ctx.SetStatus(http.StatusOK)
 		ctx.TakeOver()
 		promHandler.ServeHTTP(ctx.Writer, ctx.Request)
 	})
@@ -108,8 +112,9 @@ func mountWeb(app *yukinohttp.Application, webDir string) {
 	}
 	app.Static("/", webDir)
 	app.Get("/", func(ctx *yukinohttp.Context, next func()) {
+		ctx.SetStatus(http.StatusOK)
 		ctx.TakeOver()
 		http.ServeFile(ctx.Writer, ctx.Request, filepath.Join(webDir, "index.html"))
 	})
-	log.Printf("[gateway] 静态前端目录: %s", webDir)
+	log.Printf("[gateway] static frontend dir: %s", webDir)
 }

@@ -10,7 +10,7 @@ type Response struct {
 
 // OK builds a success envelope.
 func OK(data any) *Response {
-	return &Response{Code: "0000", Info: "成功", Data: data}
+	return &Response{Code: "0000", Info: "success", Data: data}
 }
 
 // Fail builds an error envelope from a code/info pair.

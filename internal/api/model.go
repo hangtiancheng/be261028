@@ -56,7 +56,7 @@ type GroupBuyActivityDiscountVO struct {
 }
 
 // IsVisible mirrors GroupBuyActivityDiscountVO.isVisible: a blank tagScope allows
-// visibility; otherwise scope "1"（可见限制）refuses it.
+// visibility; otherwise scope "1" (visibility restriction) refuses it.
 //
 // Defect fix: the legacy parser only inspected split[0] for "1", so a scope of
 // "2,1" was treated as visible. Membership is now checked across all segments.
@@ -68,7 +68,7 @@ func (v *GroupBuyActivityDiscountVO) IsVisible() bool {
 }
 
 // IsEnable mirrors GroupBuyActivityDiscountVO.isEnable: a blank tagScope allows
-// participation; otherwise scope "2"（参与限制）refuses it.
+// participation; otherwise scope "2" (participation restriction) refuses it.
 //
 // Defect fix: the legacy parser required exactly two segments with "2" in the
 // second position, so "2" alone or "2,1" silently allowed participation.

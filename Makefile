@@ -1,10 +1,11 @@
-# be261028 拼团营销系统 - 构建与运行
-# 由 easy-group-buy (Java/Spring Boot) 迁移到 Go + yukino_http + yukino_rpc + Kafka
+# be261028 group-buy marketing system - build and run
+# Migrated from easy-group-buy (Java/Spring Boot) to Go + yukino_http + yukino_rpc + Kafka
 #
-# 运行方式说明：本机存在企业安全代理(EDR)+ macOS AMFI，会对项目 bin/ 下的
-# ad-hoc 签名二进制做代码签名校验并间歇性 SIGKILL。`go run`（临时目录二进制）
-# 不受影响，因此推荐用 run-* 目标启动服务。若需使用 bin/ 二进制，build 目标已
-# 附带 codesign 重签名以尽量规避。
+# How to run: this machine runs an enterprise security agent (EDR) + macOS AMFI that
+# performs code-signing verification on the ad-hoc signed binaries under bin/ and
+# intermittently SIGKILLs them. `go run` (binaries in a temp directory) is not
+# affected, so prefer the run-* targets to start services. If the bin/ binaries are
+# needed, the build target re-signs them with codesign as a best-effort workaround.
 
 GO ?= go
 BIN_DIR := bin
@@ -16,7 +17,7 @@ all: build
 
 build: sign
 
-# 构建并 ad-hoc 重签名（--options runtime 有助于通过 AMFI 校验）
+# Build and re-sign ad-hoc (--options runtime helps pass AMFI verification)
 sign:
 	$(GO) build -o $(BIN_DIR)/activity ./cmd/activity
 	$(GO) build -o $(BIN_DIR)/trade ./cmd/trade
@@ -26,7 +27,7 @@ sign:
 	done
 	@echo "built + signed: $(BIN_DIR)/{activity,trade,gateway}"
 
-# 按依赖顺序启动：activity -> trade -> gateway（推荐，规避 EDR 对 bin/ 的拦截）
+# Start in dependency order: activity -> trade -> gateway (recommended; avoids EDR kills of bin/ binaries)
 run-activity:
 	$(GO) run ./cmd/activity -config configs/activity.yaml
 
@@ -55,11 +56,11 @@ fmt:
 clean:
 	rm -rf $(BIN_DIR)
 
-# 初始化数据库（需要本机 docker mysql 已启动，root/pass）
+# Initialize the database (requires the local docker mysql running, root/pass)
 init-db:
 	docker exec -i hangtiancheng-mysql-1 mysql -uroot -ppass < deployments/sql/be261028.sql
 
-# 前端（独立工程）：pnpm build 产出 frontend/dist，由网关 webDir 静态服务
+# Frontend (standalone project): pnpm build produces frontend/dist, served statically by the gateway webDir
 frontend-install:
 	cd frontend && pnpm install
 

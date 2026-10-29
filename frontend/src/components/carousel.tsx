@@ -2,7 +2,7 @@ import { createRef, customElement, property, state, type Ref } from '@yukino.js/
 import { animate } from 'motion';
 import { UiElement } from './base';
 
-/** 商品图轮播：自动播放 + 指示点 + motion 弹簧滑动，悬停暂停。 */
+/** Product artwork carousel: autoplay + indicator dots + motion spring sliding; pauses on hover. */
 @customElement('x-carousel')
 export class Carousel extends UiElement {
   @property({ attribute: false }) images: string[] = [];
@@ -48,7 +48,8 @@ export class Carousel extends UiElement {
         <div ref={this.trackRef} className="flex will-change-transform">
           {this.images.map((src) => (
             <div className="w-full shrink-0">
-              <img src={src} alt="商品图" loading="lazy" className="aspect-square w-full object-cover" />
+              {/* Generated on canvas (data URI) — never an image file. */}
+              <img src={src} alt="Generated product artwork" loading="lazy" className="aspect-square w-full object-cover" />
             </div>
           ))}
         </div>
@@ -56,7 +57,7 @@ export class Carousel extends UiElement {
           {this.images.map((_, i) => (
             <button
               onClick={() => this.go(i)}
-              aria-label={`第${i + 1}张`}
+              aria-label={`Go to slide ${i + 1}`}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === this.index ? 'w-5 bg-white' : 'w-1.5 bg-white/60'
               }`}

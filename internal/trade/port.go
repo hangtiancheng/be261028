@@ -42,7 +42,7 @@ func (p *TradePort) GroupBuyNotify(ctx context.Context, task *NotifyTaskEntity) 
 	lock := p.redis.NewLock(task.LockKey())
 	acquired, err := lock.TryLock(ctx, p.lockWait, p.lockLease)
 	if err != nil {
-		log.Printf("拼团通知任务抢锁失败，lockKey:%s err:%v", task.LockKey(), err)
+		log.Printf("[trade] notify task failed to acquire the lock lockKey:%s err:%v", task.LockKey(), err)
 		return types.NotifyTaskNull, nil
 	}
 	if !acquired {
@@ -50,31 +50,37 @@ func (p *TradePort) GroupBuyNotify(ctx context.Context, task *NotifyTaskEntity) 
 	}
 	defer func() {
 		if err := lock.Unlock(ctx); err != nil {
-			log.Printf("拼团通知任务释放锁失败，lockKey:%s err:%v", task.LockKey(), err)
+			log.Printf("[trade] notify task failed to release the lock lockKey:%s err:%v", task.LockKey(), err)
 		}
 	}()
 
 	switch task.NotifyType {
 	case types.NotifyTypeHTTP:
-		// 无效的 notifyUrl 则直接返回成功
-		if types.IsBlank(task.NotifyUrl) || task.NotifyUrl == "暂无" {
+		// An invalid notifyUrl is treated as success with no callback.
+		if types.IsBlank(task.NotifyUrl) || task.NotifyUrl == notifyUrlNone {
 			return types.NotifyTaskSuccess, nil
 		}
 		body, err := p.httpNotify(ctx, task.NotifyUrl, task.ParameterJson)
 		if err != nil {
-			log.Printf("拼团回调 HTTP 接口服务异常 %s: %v", task.NotifyUrl, err)
+			log.Printf("[trade] group-buy HTTP callback failed url:%s err:%v", task.NotifyUrl, err)
 			return types.NotifyTaskNull, nil
 		}
 		return types.NotifyTaskResult(strings.TrimSpace(body)), nil
 	case types.NotifyTypeMQ:
 		if err := p.producer.Publish(ctx, task.NotifyMQ, []byte(task.ParameterJson)); err != nil {
-			log.Printf("发送MQ消息失败 topic:%s message:%s err:%v", task.NotifyMQ, task.ParameterJson, err)
+			log.Printf("[trade] failed to publish MQ message topic:%s message:%s err:%v", task.NotifyMQ, task.ParameterJson, err)
 			return types.NotifyTaskNull, nil
 		}
 		return types.NotifyTaskSuccess, nil
 	}
 	return types.NotifyTaskNull, nil
 }
+
+// notifyUrlNone is the placeholder value the legacy system stored in notify_url to
+// mean "no callback configured". It is compared against potentially-persisted data,
+// so the literal is preserved verbatim for parity with legacy rows and clients;
+// translating it would cause such values to be dialed as real URLs.
+const notifyUrlNone = "暂无"
 
 // httpNotify POSTs the parameter JSON to the callback URL and returns the body.
 func (p *TradePort) httpNotify(ctx context.Context, url, body string) (string, error) {

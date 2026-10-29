@@ -1,20 +1,26 @@
 import { createRef, customElement, state, type Ref } from '@yukino.js/lit-jsx';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { animate, stagger } from 'motion';
 import { genProductArt } from '../lib/art';
 import { setUsername } from '../lib/auth';
+import { ICONS, svgIcon } from '../lib/icons';
 import { navigate } from '../lib/router';
 import { toast } from '../lib/toast';
 import { UiElement } from '../components/base';
 
 const DEMO_USERS = ['xfg01', 'xfg02', 'xfg03'];
 
-/** 桌面端左侧宣传位特性列表。 */
-const FEATURES = ['直降优惠 · 开团立享拼团价', '实时倒计时 · 成团进度一目了然', '极速退单 · 名额即时释放'];
+/** Desktop-only hero feature list on the left column. */
+const FEATURES = [
+  'Instant deduction — the group price applies the moment you lock in',
+  'Live countdowns — team progress at a glance',
+  'One-click refunds — seats are released immediately',
+];
 
-/** 宣传缩略图：canvas 代码生成，不使用图片文件。 */
+/** Hero thumbnails: generated on canvas; no image files anywhere. */
 const HERO_THUMBS = [0, 1, 2].map((i) => genProductArt(`login-hero-${i}`));
 
-/** 登录页：玻璃拟态卡片 + 渐变光斑动效；纯前端登录（写 cookie）。 */
+/** Login page: glassmorphism card + floating gradient blobs; front-end-only login (writes a cookie). */
 @customElement('x-login-page')
 export class LoginPage extends UiElement {
   @state() private username = '';
@@ -69,17 +75,17 @@ export class LoginPage extends UiElement {
     if (this.busy) return;
     const name = this.username.trim();
     if (!name) {
-      toast.error('请输入用户名');
+      toast.error('Please enter a username');
       return;
     }
     if (!this.password) {
-      toast.error('请输入密码');
+      toast.error('Please enter a password');
       return;
     }
     this.busy = true;
     setUsername(name);
     window.setTimeout(() => {
-      toast.success(`欢迎回来，${name}`);
+      toast.success(`Welcome back, ${name}`);
       navigate('/', { replace: true });
     }, 380);
   }
@@ -87,30 +93,33 @@ export class LoginPage extends UiElement {
   render() {
     return (
       <div className="relative min-h-dvh overflow-hidden bg-gradient-to-br from-brand-600 via-rose-500 to-orange-400">
-        {/* 漂浮光斑 */}
+        {/* Floating gradient blobs */}
         <div data-blob className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-white/25 blur-3xl" />
         <div data-blob className="absolute -right-16 top-1/3 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
         <div data-blob className="absolute -bottom-28 left-1/4 h-96 w-96 rounded-full bg-brand-300/30 blur-3xl" />
 
         <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 lg:max-w-5xl lg:flex-row lg:items-center lg:gap-16 lg:px-8 xl:max-w-6xl xl:gap-24">
-          {/* 桌面端左侧宣传位（移动端隐藏） */}
+          {/* Desktop hero column (hidden on mobile) */}
           <div data-hero className="hidden flex-1 lg:block">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
-              🛒 be261028 · 拼团营销演示
+              {unsafeHTML(svgIcon(ICONS.cart, 'h-3.5 w-3.5'))}
+              be261028 · Group-Buy Marketing Demo
             </div>
             <h2 className="mt-6 text-4xl font-black leading-tight tracking-wide text-white xl:text-5xl">
-              越拼越便宜
+              Team up
               <br />
-              人满即成团
+              and pay less
             </h2>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
-              锁单立减 · 到时自动成团，支持直减 / 满减 / N元购 / 折扣多种营销计划，交易结算与退单全链路模拟。
+              Lock-in instant deductions and automatic team completion, with direct-deduction,
+              threshold, fixed-price and percentage marketing plans — plus a fully simulated
+              settlement and refund flow.
             </p>
             <ul className="mt-7 flex flex-col gap-3">
               {FEATURES.map((f) => (
                 <li data-feature className="flex items-center gap-3 text-sm font-medium text-white/90">
-                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/25 text-[10px] text-white">
-                    ✓
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/25 text-white">
+                    {unsafeHTML(svgIcon(ICONS.check, 'h-3 w-3 [stroke-width:2.8]'))}
                   </span>
                   {f}
                 </li>
@@ -120,51 +129,51 @@ export class LoginPage extends UiElement {
               {HERO_THUMBS.map((src) => (
                 <img
                   src={src}
-                  alt="商品海报（代码生成）"
+                  alt="Generated product artwork"
                   className="h-20 w-20 rounded-2xl border border-white/25 object-cover shadow-lg shadow-brand-900/25 xl:h-24 xl:w-24"
                 />
               ))}
             </div>
           </div>
 
-          {/* 登录卡片（移动端 / 桌面端通用） */}
+          {/* Login card (shared between mobile and desktop) */}
           <div className="w-full lg:max-w-md lg:shrink-0">
           <div className="mb-8 text-center">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/20 text-3xl shadow-lg backdrop-blur">
-              🛒
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/20 text-white shadow-lg backdrop-blur">
+              {unsafeHTML(svgIcon(ICONS.cart, 'h-8 w-8'))}
             </div>
-            <h1 className="mt-4 text-2xl font-black tracking-wide text-white">be261028 拼团</h1>
-            <p className="mt-1.5 text-sm text-white/70">越拼越便宜 · 人满即成团</p>
+            <h1 className="mt-4 text-2xl font-black tracking-wide text-white">be261028 Group Buy</h1>
+            <p className="mt-1.5 text-sm text-white/70">Team up and pay less · Teams complete when full</p>
           </div>
 
           <div
             ref={this.cardRef}
             className="rounded-3xl border border-white/25 bg-white/15 p-7 shadow-2xl shadow-brand-900/20 backdrop-blur-xl"
           >
-            <h2 className="mb-4 text-center text-base font-black text-white">欢迎登录</h2>
+            <h2 className="mb-4 text-center text-base font-black text-white">Welcome back</h2>
             <form onSubmit={(e) => this.submit(e)} className="flex flex-col gap-4">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-white/80">用户名</span>
+                <span className="text-xs font-medium text-white/80">Username</span>
                 <input
                   type="text"
                   value={this.username}
                   onInput={(e) => {
                     this.username = (e.target as HTMLInputElement).value;
                   }}
-                  placeholder="输入任意用户名即可体验"
+                  placeholder="Enter any username to explore"
                   autoComplete="username"
                   className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-white/70 focus:bg-white/25"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-white/80">密码</span>
+                <span className="text-xs font-medium text-white/80">Password</span>
                 <input
                   type="password"
                   value={this.password}
                   onInput={(e) => {
                     this.password = (e.target as HTMLInputElement).value;
                   }}
-                  placeholder="演示环境，任意密码"
+                  placeholder="Demo environment — any password works"
                   autoComplete="current-password"
                   className="w-full rounded-xl border border-white/25 bg-white/15 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-white/70 focus:bg-white/25"
                 />
@@ -174,12 +183,12 @@ export class LoginPage extends UiElement {
                 disabled={this.busy}
                 className="mt-1 w-full rounded-xl bg-white py-3 text-sm font-bold text-brand-600 shadow-lg shadow-brand-900/20 transition active:scale-[.98] disabled:opacity-70"
               >
-                {this.busy ? '登录中…' : '登 录'}
+                {this.busy ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
 
             <div className="mt-5 border-t border-white/15 pt-4">
-              <p className="text-center text-[11px] text-white/55">演示账号（点击填充）</p>
+              <p className="text-center text-[11px] text-white/55">Demo accounts (click to fill)</p>
               <div className="mt-2 flex justify-center gap-2">
                 {DEMO_USERS.map((u) => (
                   <button
@@ -197,7 +206,7 @@ export class LoginPage extends UiElement {
           </div>
 
           <p className="mt-6 text-center text-[11px] text-white/45">
-            纯前端登录（与旧版一致，仅写入本地 cookie）
+            Front-end-only login (parity with the legacy app; the username is stored in a local cookie)
           </p>
           </div>
         </div>

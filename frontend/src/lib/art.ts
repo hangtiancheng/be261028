@@ -1,10 +1,12 @@
 /**
- * 代码生成视觉资源 —— 全站禁用图片文件（用户硬性要求）。
+ * Programmatically generated visuals — image files are forbidden app-wide
+ * (a hard user requirement).
  *
- * 算法与 yukino-chat 的 utils/avatar.ts 一致：
- *   fnv1a 字符串哈希 → xorShift32 PRNG → 离屏 canvas 绘制确定性图案
- *   → canvas.toDataURL() → 作为 <img src> / CSS 背景使用。
- * 相同 seed 永远得到相同图案；结果按 key 记忆化，避免重复绘制。
+ * The algorithm matches yukino-chat's utils/avatar.ts:
+ *   fnv1a string hash → xorShift32 PRNG → deterministic pattern drawn on an
+ *   offscreen canvas → canvas.toDataURL() → used as an <img src> / CSS background.
+ * The same seed always yields the same artwork; results are memoized per key
+ * to avoid redundant drawing.
  */
 
 function fnv1a(str: string): number {
@@ -27,7 +29,7 @@ function xorShift32(seed: number): () => number {
   };
 }
 
-/** 单参数记忆化（替代 es-toolkit memoize，避免新增依赖）。 */
+/** Single-argument memoization (replaces es-toolkit memoize to avoid a new dependency). */
 function memoize(fn: (key: string) => string): (key: string) => string {
   const cache = new Map<string, string>();
   return (key: string): string => {
@@ -91,8 +93,10 @@ function drawShape(
 }
 
 /**
- * 商品海报图（轮播/宣传位）：对角渐变背景 + 柔光斑 + 镜像圆角几何模块。
- * seed 决定色相与布局（如 goodsId、活动 ID），同 seed 恒定同图。
+ * Product poster art (carousel / hero slots): diagonal gradient background +
+ * soft light blobs + mirrored rounded geometric modules. The seed (goodsId,
+ * activity id, …) determines hue and layout; the same seed always renders the
+ * same artwork.
  */
 export const genProductArt = memoize((seed: string): string => {
   const SIZE = 560;
@@ -102,14 +106,14 @@ export const genProductArt = memoize((seed: string): string => {
   const hue = Math.floor(rand() * 360);
   const hue2 = (hue + 55 + Math.floor(rand() * 90)) % 360;
 
-  // 背景：对角双色渐变
+  // Background: diagonal two-color gradient.
   const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE);
   bg.addColorStop(0, `hsl(${hue}, 88%, 66%)`);
   bg.addColorStop(1, `hsl(${hue2}, 80%, 42%)`);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // 柔光斑：3 个大号径向渐变
+  // Soft light blobs: three large radial gradients.
   for (let i = 0; i < 3; i++) {
     const cx = rand() * SIZE;
     const cy = rand() * SIZE;
@@ -121,7 +125,7 @@ export const genProductArt = memoize((seed: string): string => {
     ctx.fillRect(0, 0, SIZE, SIZE);
   }
 
-  // 镜像几何模块（identicon 式，左右对称）
+  // Mirrored geometric modules (identicon style, left-right symmetric).
   const GRID = 6;
   const CELL = SIZE / GRID;
   for (let col = 0; col < Math.ceil(GRID / 2); col++) {
@@ -142,7 +146,7 @@ export const genProductArt = memoize((seed: string): string => {
     }
   }
 
-  // 中央徽章：同心圆环 + 实心点，聚焦视觉中心
+  // Center badge: concentric ring + solid dot to anchor the visual focus.
   const c = SIZE / 2;
   ctx.strokeStyle = 'hsla(0, 0%, 100%, 0.5)';
   ctx.lineWidth = SIZE * 0.014;
@@ -158,7 +162,7 @@ export const genProductArt = memoize((seed: string): string => {
   ctx.arc(c, c, SIZE * 0.035, 0, Math.PI * 2);
   ctx.fill();
 
-  // 顶部高光渐隐，增强海报质感
+  // Top sheen fade for a poster-like finish.
   const sheen = ctx.createLinearGradient(0, 0, 0, SIZE * 0.5);
   sheen.addColorStop(0, 'hsla(0, 0%, 100%, 0.14)');
   sheen.addColorStop(1, 'hsla(0, 0%, 100%, 0)');
@@ -169,8 +173,59 @@ export const genProductArt = memoize((seed: string): string => {
 });
 
 /**
- * 模拟支付二维码：seed（如 outTradeNo）决定模块分布，
- * 含标准 QR 视觉要素（三个回字定位角 + 时序线 + 随机数据模块）。
+ * Deterministic user avatar (identicon style, circular clip): the seed (e.g.
+ * userId) picks the hue pair and the mirrored 5×5 module pattern.
+ */
+export const genAvatarArt = memoize((seed: string): string => {
+  const SIZE = 128;
+  const [canvas, ctx] = makeCanvas(SIZE);
+  const rand = xorShift32(fnv1a(`avatar:${seed}`));
+
+  const hue = Math.floor(rand() * 360);
+  const hue2 = (hue + 40 + Math.floor(rand() * 80)) % 360;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
+  ctx.clip();
+
+  const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+  bg.addColorStop(0, `hsl(${hue}, 78%, 62%)`);
+  bg.addColorStop(1, `hsl(${hue2}, 72%, 44%)`);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Mirrored identicon modules.
+  const GRID = 5;
+  const CELL = SIZE / GRID;
+  for (let col = 0; col < Math.ceil(GRID / 2); col++) {
+    for (let row = 0; row < GRID; row++) {
+      if (rand() >= 0.55) continue;
+      ctx.fillStyle = `hsla(0, 0%, 100%, ${(0.16 + rand() * 0.3).toFixed(3)})`;
+      const pad = CELL * 0.12;
+      ctx.fillRect(col * CELL + pad, row * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+      const mirrorCol = GRID - 1 - col;
+      if (mirrorCol !== col) {
+        ctx.fillRect(mirrorCol * CELL + pad, row * CELL + pad, CELL - pad * 2, CELL - pad * 2);
+      }
+    }
+  }
+
+  // Subtle top-left highlight for depth.
+  const sheen = ctx.createRadialGradient(SIZE * 0.3, SIZE * 0.25, 0, SIZE * 0.3, SIZE * 0.25, SIZE * 0.75);
+  sheen.addColorStop(0, 'hsla(0, 0%, 100%, 0.22)');
+  sheen.addColorStop(1, 'hsla(0, 0%, 100%, 0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  ctx.restore();
+  return canvas.toDataURL();
+});
+
+/**
+ * Simulated payment QR code: the seed (e.g. outTradeNo) drives the module
+ * distribution; includes the standard QR visual elements (three finder
+ * patterns + timing lines + pseudo-random data modules). Not a real QR code.
  */
 export const genQrArt = memoize((seed: string): string => {
   const MODULES = 25;
@@ -193,20 +248,20 @@ export const genQrArt = memoize((seed: string): string => {
     (row < 8 && col >= MODULES - 8) ||
     (row >= MODULES - 8 && col < 8);
 
-  // 数据模块
+  // Data modules.
   for (let row = 0; row < MODULES; row++) {
     for (let col = 0; col < MODULES; col++) {
       if (!inFinder(row, col) && rand() > 0.5) at(row, col);
     }
   }
-  // 时序线（第 6 行/列交替）
+  // Timing lines (alternating modules on row/column 6).
   for (let i = 8; i < MODULES - 8; i++) {
     if (i % 2 === 0) {
       at(6, i);
       at(i, 6);
     }
   }
-  // 三个回字定位角
+  // The three finder patterns.
   const finder = (topRow: number, leftCol: number): void => {
     ctx.fillStyle = DARK;
     ctx.fillRect((QUIET + leftCol) * CELL, (QUIET + topRow) * CELL, CELL * 7, CELL * 7);

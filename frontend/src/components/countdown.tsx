@@ -4,9 +4,9 @@ import { fromSeconds, fmtCountdown, parseCountdown, parseTime, type Countdown } 
 import { UiElement } from './base';
 
 /**
- * 实时倒计时：优先按 endTime（绝对时间）计算；
- * 无 endTime 时以 initial("HH:MM:SS") 为基准随时间递减。
- * 剩余 60s 内变红并以 motion 做每秒轻微跳动。
+ * Live countdown: prefers the absolute endTime when available; otherwise
+ * decrements from the initial "HH:MM:SS" string as wall time passes.
+ * Turns red within the last 60 seconds with a subtle per-tick motion pulse.
  */
 @customElement('x-countdown')
 export class CountDown extends UiElement {
@@ -49,7 +49,7 @@ export class CountDown extends UiElement {
 
   render() {
     if (this.cd.ended) {
-      return <span className="text-[11px] font-medium text-zinc-300">已结束</span>;
+      return <span className="text-[11px] font-medium text-zinc-300">Ended</span>;
     }
     const urgent = this.cd.total < 60;
     return (

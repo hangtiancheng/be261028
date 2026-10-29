@@ -1,12 +1,13 @@
-# be261028 Prometheus 抓取配置示例
+# be261028 Prometheus scrape configuration example
 #
-# 本机 docker 的 Prometheus 配置文件位于：
-#   ~/github/hangtiancheng/docker/prometheus/prometheus.yml （只读挂载）
-# 将下面的 job 追加到其 scrape_configs 后即可抓取三个 Go 服务的指标。
+# The local docker Prometheus configuration lives at:
+#   ~/github/hangtiancheng/docker/prometheus/prometheus.yml (mounted read-only)
+# Append the jobs below to its scrape_configs to scrape the three Go services.
 #
-# 注意：gateway 的 /metrics 暴露在主 HTTP 端口 8091；activity/trade 暴露在各自的
-# metrics 端口（19101/19102，见 configs/activity.yaml 与 configs/trade.yaml）。
-# 若 Prometheus 运行在 docker 网络内，请用 host.docker.internal 访问宿主机端口。
+# Note: the gateway exposes /metrics on its main HTTP port 8091; activity/trade
+# expose theirs on dedicated metrics ports (19101/19102, see configs/activity.yaml
+# and configs/trade.yaml). When Prometheus runs inside the docker network, use
+# host.docker.internal to reach host ports.
 
 scrape_configs:
   - job_name: be261028-gateway

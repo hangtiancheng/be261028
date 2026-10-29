@@ -73,7 +73,7 @@ func (r *TradeRepository) LockMarketPayOrder(ctx context.Context, agg *GroupBuyO
 
 	teamId := payActivity.TeamId
 	if types.IsBlank(teamId) {
-		// 首次开团：生成 teamId 并创建拼团订单
+		// First-time team creation: generate a teamId and insert the group-buy order.
 		teamId = randomNumeric(8)
 		currentDate := types.Now()
 		validEndTime := currentDate.Add(time.Duration(payActivity.ValidTime) * time.Minute)
@@ -95,8 +95,9 @@ func (r *TradeRepository) LockMarketPayOrder(ctx context.Context, agg *GroupBuyO
 		}
 		err := r.dao.InsertGroupBuyOrder(ctx, tx, order)
 		if err != nil && dao.IsDuplicateKey(err) {
-			// 缺陷修复：随机 teamId 撞唯一键时重新生成重试一次，而不是把错误抛给用户
-			log.Printf("开团 teamId 冲突，重新生成重试 旧teamId:%s", teamId)
+			// Defect fix: on a random-teamId unique-key collision, regenerate and retry
+			// once instead of surfacing the error to the user.
+			log.Printf("[trade] team creation teamId collision, regenerating and retrying oldTeamId:%s", teamId)
 			teamId = randomNumeric(8)
 			order.TeamId = teamId
 			err = r.dao.InsertGroupBuyOrder(ctx, tx, order)
@@ -105,7 +106,7 @@ func (r *TradeRepository) LockMarketPayOrder(ctx context.Context, agg *GroupBuyO
 			return nil, err
 		}
 	} else {
-		// 加入已有团：锁单量 +1，未满才可加入
+		// Joining an existing team: bump the lock count by 1; only allowed while not full.
 		updated, err := r.dao.UpdateAddLockCount(ctx, tx, teamId)
 		if err != nil {
 			return nil, err
@@ -178,7 +179,7 @@ func (r *TradeRepository) QueryGroupBuyProgress(ctx context.Context, teamId stri
 func (r *TradeRepository) QueryGroupBuyActivityEntityByActivityId(ctx context.Context, activityId int64) (*GroupBuyActivityEntity, error) {
 	po, err := r.dao.QueryGroupBuyActivityByActivityId(ctx, r.db, activityId)
 	if errors.Is(err, dao.ErrNotFound) {
-		return nil, fmt.Errorf("拼团活动不存在: %d", activityId)
+		return nil, fmt.Errorf("group-buy activity not found: %d", activityId)
 	}
 	if err != nil {
 		return nil, err
@@ -209,7 +210,7 @@ func (r *TradeRepository) QueryOrderCountByActivityId(ctx context.Context, activ
 func (r *TradeRepository) QueryGroupBuyTeamByTeamId(ctx context.Context, teamId string) (*GroupBuyTeamEntity, error) {
 	po, err := r.dao.QueryGroupBuyTeamByTeamId(ctx, r.db, teamId)
 	if errors.Is(err, dao.ErrNotFound) {
-		return nil, fmt.Errorf("拼团队伍不存在: %s", teamId)
+		return nil, fmt.Errorf("group-buy team not found: %s", teamId)
 	}
 	if err != nil {
 		return nil, err
@@ -227,7 +228,7 @@ func (r *TradeRepository) QueryGroupBuyTeamByTeamId(ctx context.Context, teamId 
 		NotifyConfigVO: &NotifyConfigVO{
 			NotifyType: types.NotifyTypeOf(po.NotifyType),
 			NotifyUrl:  po.NotifyUrl.String,
-			NotifyMQ:   r.topicTeamSuccess, // MQ 回调固定使用成团主题
+			NotifyMQ:   r.topicTeamSuccess, // MQ callbacks always use the team-success topic
 		},
 	}, nil
 }
@@ -246,7 +247,7 @@ func (r *TradeRepository) SettlementMarketPayOrder(ctx context.Context, agg *Gro
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// 1. 更新拼团订单明细状态为完成
+	// 1. Mark the order-detail row complete.
 	cnt, err := r.dao.UpdateOrderListStatus2COMPLETE(ctx, tx, user.UserId, paySuccess.OutTradeNo, paySuccess.OutTradeTime)
 	if err != nil {
 		return nil, err
@@ -255,7 +256,7 @@ func (r *TradeRepository) SettlementMarketPayOrder(ctx context.Context, agg *Gro
 		return nil, types.NewAppError(types.ResponseUpdateZero)
 	}
 
-	// 2. 更新拼团达成数量
+	// 2. Increment the team's complete count.
 	cnt, err = r.dao.UpdateAddCompleteCount(ctx, tx, team.TeamId)
 	if err != nil {
 		return nil, err
@@ -264,11 +265,13 @@ func (r *TradeRepository) SettlementMarketPayOrder(ctx context.Context, agg *Gro
 		return nil, types.NewAppError(types.ResponseUpdateZero)
 	}
 
-	// 3. 达成目标则成团并写入回调任务
+	// 3. If the target is met, form the team and record the callback task.
 	//
-	// 缺陷修复：旧版用事务前快照判断成团（targetCount-completeCount==1）。当最后两名
-	// 成员并发结算时，两边都读到旧的 completeCount，谁都不会触发成团，队伍停留在
-	// status=0。此处改为在事务内（持有行锁）重新读取最新计数判断。
+	// Defect fix: the legacy version decided team completion from a pre-transaction
+	// snapshot (targetCount-completeCount==1). When the last two members settled
+	// concurrently, both read the stale completeCount, neither triggered completion,
+	// and the team stayed at status=0. Here we re-read the latest counts inside the
+	// transaction (holding the row lock) before deciding.
 	current, err := r.dao.QueryGroupBuyTeamByTeamId(ctx, tx, team.TeamId)
 	if err != nil {
 		return nil, err
@@ -385,28 +388,58 @@ func (r *TradeRepository) UpdateNotifyTaskStatusRetry(ctx context.Context, id in
 	return int(n), err
 }
 
-// OccupyTeamStock mirrors the legacy Redis stock occupation.
+// OccupyTeamStock mirrors the legacy Redis stock occupation, with two defect fixes.
+//
+// Invariant: occupy = incr + 1. The +1 accounts for the team leader's seat, which
+// is recorded via lock_count=1 in MySQL and never counted in the Redis teamStockKey.
+// Every subsequent joiner runs through this counter, so incr is the number of
+// joiners and occupy is the total team size including the leader. This is NOT an
+// off-by-one; do not "fix" it by dropping the +1.
+//
+// Defect fix 1 (legacy: rejected attempts never rolled back their INCR, permanently
+// inflating the counter so a later legitimate join could be refused): when the
+// capacity check fails we now DECR the counter to undo our speculative increment,
+// keeping it accurate.
+//
+// Defect fix 2 (legacy: teamStockKey/recoveryTeamStockKey had no TTL and grew
+// without bound): we now set a TTL of validTime+60 minutes, refreshed on each call,
+// so the counters expire shortly after the team's join window closes. Expiry is
+// safe because joins past the window are already rejected by the activity time
+// check (E0102), so a reset counter cannot cause overselling.
 func (r *TradeRepository) OccupyTeamStock(ctx context.Context, teamStockKey, recoveryTeamStockKey string, target, validTime int) (bool, error) {
 	recoveryCount, err := r.redis.GetAtomicLong(ctx, recoveryTeamStockKey)
 	if err != nil {
 		return false, err
 	}
+	ttl := time.Duration(validTime+60) * time.Minute
+	// Bound the recovery counter's lifetime too (best effort; ignore result).
+	if _, err := r.redis.Expire(ctx, recoveryTeamStockKey, ttl); err != nil {
+		log.Printf("failed to set TTL on recovery stock key %s: %v", recoveryTeamStockKey, err)
+	}
 	incr, err := r.redis.Incr(ctx, teamStockKey)
 	if err != nil {
 		return false, err
 	}
+	// Keep the counter alive for the team's join window (best effort).
+	if _, err := r.redis.Expire(ctx, teamStockKey, ttl); err != nil {
+		log.Printf("failed to set TTL on team stock key %s: %v", teamStockKey, err)
+	}
 	occupy := incr + 1
 	if occupy > int64(target)+recoveryCount {
+		// Capacity exceeded: roll back our speculative increment so the counter
+		// does not stay inflated for subsequent joiners.
+		if _, decErr := r.redis.Decr(ctx, teamStockKey); decErr != nil {
+			log.Printf("failed to roll back team stock key %s: %v", teamStockKey, decErr)
+		}
 		return false, nil
 	}
 	lockKey := teamStockKey + types.Underline + strconv.FormatInt(occupy, 10)
-	ttl := time.Duration(validTime+60) * time.Minute
 	lock, err := r.redis.SetNx(ctx, lockKey, ttl)
 	if err != nil {
 		return false, err
 	}
 	if !lock {
-		log.Printf("组队库存加锁失败 %s", lockKey)
+		log.Printf("team stock lock acquisition failed %s", lockKey)
 	}
 	return lock, nil
 }
@@ -432,17 +465,17 @@ func (r *TradeRepository) Refund2AddRecovery(ctx context.Context, recoveryTeamSt
 		return err
 	}
 	if !acquired {
-		log.Printf("订单 %s 恢复库存操作已在进行中，跳过重复操作", orderId)
+		log.Printf("[trade] stock recovery for order %s is already in progress, skipping duplicate", orderId)
 		return nil
 	}
 	if _, err := r.redis.Incr(ctx, recoveryTeamStockKey); err != nil {
-		// 释放锁，允许消息重新消费恢复库存
+		// Release the lock so the message can be redelivered and recover the stock.
 		if rmErr := r.redis.Remove(ctx, lockKey); rmErr != nil {
-			log.Printf("订单 %s 恢复库存失败后释放锁失败: %v", orderId, rmErr)
+			log.Printf("[trade] failed to release the lock after a stock-recovery error for order %s: %v", orderId, rmErr)
 		}
 		return err
 	}
-	log.Printf("订单 %s 恢复库存成功，恢复库存key: %s", orderId, recoveryTeamStockKey)
+	log.Printf("[trade] stock recovered for order %s, recovery key: %s", orderId, recoveryTeamStockKey)
 	return nil
 }
 
@@ -458,7 +491,7 @@ func (r *TradeRepository) Unpaid2Refund(ctx context.Context, agg *GroupBuyRefund
 			return err
 		}
 		if cnt != 1 {
-			log.Printf("逆向流程-unpaid2Refund，更新订单状态(退单)失败 %s %s", order.UserId, order.OrderId)
+			log.Printf("[trade] reverse flow - unpaid2Refund failed to update order status (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 			return types.NewAppError(types.ResponseUpdateZero)
 		}
 		cnt, err = r.dao.UpdateOrderUnpaid2Refund(ctx, tx, order.TeamId, progress.LockCount)
@@ -466,7 +499,7 @@ func (r *TradeRepository) Unpaid2Refund(ctx context.Context, agg *GroupBuyRefund
 			return err
 		}
 		if cnt != 1 {
-			log.Printf("逆向流程-unpaid2Refund，更新组队记录(退单)失败 %s %s", order.UserId, order.OrderId)
+			log.Printf("[trade] reverse flow - unpaid2Refund failed to update team record (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 			return types.NewAppError(types.ResponseUpdateZero)
 		}
 		return nil
@@ -483,7 +516,7 @@ func (r *TradeRepository) Paid2Refund(ctx context.Context, agg *GroupBuyRefundAg
 			return err
 		}
 		if cnt != 1 {
-			log.Printf("逆向流程-paid2Refund，更新订单状态(退单)失败 %s %s", order.UserId, order.OrderId)
+			log.Printf("[trade] reverse flow - paid2Refund failed to update order status (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 			return types.NewAppError(types.ResponseUpdateZero)
 		}
 		cnt, err = r.dao.UpdateOrderPaid2Refund(ctx, tx, order.TeamId, progress.LockCount, progress.CompleteCount)
@@ -491,7 +524,7 @@ func (r *TradeRepository) Paid2Refund(ctx context.Context, agg *GroupBuyRefundAg
 			return err
 		}
 		if cnt != 1 {
-			log.Printf("逆向流程-paid2Refund，更新组队记录(退单)失败 %s %s", order.UserId, order.OrderId)
+			log.Printf("[trade] reverse flow - paid2Refund failed to update team record (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 			return types.NewAppError(types.ResponseUpdateZero)
 		}
 		return nil
@@ -499,7 +532,8 @@ func (r *TradeRepository) Paid2Refund(ctx context.Context, agg *GroupBuyRefundAg
 }
 
 // PaidTeam2Refund mirrors the legacy transactional paid (formed team) refund. The
-// team status transition (完成含退单 vs 失败) depends on whether the last member refunded.
+// team status transition (complete-with-refund vs failed) depends on whether the
+// last member refunded.
 func (r *TradeRepository) PaidTeam2Refund(ctx context.Context, agg *GroupBuyRefundAggregate) (*NotifyTaskEntity, error) {
 	order := agg.TradeRefundOrderEntity
 	progress := agg.GroupBuyProgress
@@ -510,7 +544,7 @@ func (r *TradeRepository) PaidTeam2Refund(ctx context.Context, agg *GroupBuyRefu
 			return err
 		}
 		if cnt != 1 {
-			log.Printf("逆向流程-paidTeam2Refund，更新订单状态(退单)失败 %s %s", order.UserId, order.OrderId)
+			log.Printf("[trade] reverse flow - paidTeam2Refund failed to update order status (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 			return types.NewAppError(types.ResponseUpdateZero)
 		}
 		switch teamStatus {
@@ -520,7 +554,7 @@ func (r *TradeRepository) PaidTeam2Refund(ctx context.Context, agg *GroupBuyRefu
 				return err
 			}
 			if cnt != 1 {
-				log.Printf("逆向流程-paidTeam2Refund，更新组队记录(退单)失败 %s %s", order.UserId, order.OrderId)
+				log.Printf("[trade] reverse flow - paidTeam2Refund failed to update team record (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 				return types.NewAppError(types.ResponseUpdateZero)
 			}
 		case types.GroupBuyOrderFail:
@@ -529,7 +563,7 @@ func (r *TradeRepository) PaidTeam2Refund(ctx context.Context, agg *GroupBuyRefu
 				return err
 			}
 			if cnt != 1 {
-				log.Printf("逆向流程-updateTeamPaid2RefundFail，更新组队记录(退单)失败 %s %s", order.UserId, order.OrderId)
+				log.Printf("[trade] reverse flow - updateTeamPaid2RefundFail failed to update team record (refund) userId:%s orderId:%s", order.UserId, order.OrderId)
 				return types.NewAppError(types.ResponseUpdateZero)
 			}
 		}

@@ -7,9 +7,11 @@ import { LoginPage } from './pages/login';
 import { currentPath, onRouteChange, startRouter } from './lib/router';
 
 /**
- * 应用根组件：轻量 hash 路由分发（登录 / 首页 / 管理后台）+ 全局 toast 宿主。
- * 说明：@yukino.js/lit-jsx@0.0.1 未导出 community router，按技能文档的 hash
- * 模式语义用 lib/router.ts 实现最小路由。
+ * Application root: lightweight hash-router dispatch (login / home / admin)
+ * plus the global toast host.
+ * Note: @yukino.js/lit-jsx@0.0.1 does not export the community router, so the
+ * hash-mode semantics described in the skill docs are implemented directly in
+ * lib/router.ts as a minimal router.
  */
 @customElement('x-app')
 export class App extends UiElement {

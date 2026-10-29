@@ -1,6 +1,6 @@
-/** 通用工具：随机单号、金额/时间格式化、倒计时解析。 */
+/** Shared helpers: trade-number generation, money/time formatting, countdown parsing. */
 
-/** 生成 n 位随机数字串（默认 12 位外部交易单号）。 */
+/** Generates an n-digit random numeric string (crypto-seeded). */
 export function randomNumeric(n = 12): string {
   let s = '';
   const buf = new Uint32Array(n);
@@ -9,13 +9,18 @@ export function randomNumeric(n = 12): string {
   return s;
 }
 
-/** 金额格式化：始终两位小数。 */
+/** Unique external trade number per attempt: OTN-<timestamp>-<rand>. */
+export function newOutTradeNo(): string {
+  return `OTN-${Date.now()}-${randomNumeric(6)}`;
+}
+
+/** Money formatting: always two decimal places. */
 export function fmtPrice(v: number | string | null | undefined): string {
   const n = typeof v === 'string' ? Number(v) : (v ?? 0);
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
 }
 
-/** "2026-10-28T19:02:00" / ISO → Date（无时区后缀按本地时区解析）。 */
+/** "2026-10-28T19:02:00" / ISO → Date (values without a timezone suffix parse as local time). */
 export function parseTime(v: string | null | undefined): Date | null {
   if (!v) return null;
   const d = new Date(v);
@@ -30,7 +35,7 @@ export interface Countdown {
   ended: boolean;
 }
 
-/** 由剩余秒数构造倒计时。 */
+/** Builds a countdown from a remaining-seconds value. */
 export function fromSeconds(total: number): Countdown {
   const t = Math.max(0, Math.floor(total));
   return {
@@ -42,12 +47,16 @@ export function fromSeconds(total: number): Countdown {
   };
 }
 
-/** 解析后端 "HH:MM:SS" 倒计时字符串。 */
+/**
+ * Parses the backend countdown string ("HH:MM:SS", optionally prefixed with
+ * "Nd " for windows of a day or more). Returns null for "Ended"/"Invalid time".
+ */
 export function parseCountdown(hhmmss: string | null | undefined): Countdown | null {
   if (!hhmmss) return null;
-  const m = /^(\d+):(\d{2}):(\d{2})$/.exec(hhmmss.trim());
+  const m = /^(?:(\d+)d\s+)?(\d+):(\d{2}):(\d{2})$/.exec(hhmmss.trim());
   if (!m) return null;
-  return fromSeconds(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]));
+  const days = m[1] ? Number(m[1]) : 0;
+  return fromSeconds(days * 86400 + Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]));
 }
 
 export function fmtCountdown(c: Countdown): string {
@@ -55,26 +64,26 @@ export function fmtCountdown(c: Countdown): string {
   return `${p(c.hours)}:${p(c.minutes)}:${p(c.seconds)}`;
 }
 
-/** Date → "YYYY-MM-DDTHH:mm:ss"（本地时区，后端可解析）。 */
+/** Date → "YYYY-MM-DDTHH:mm:ss" (local time; the format the backend parses). */
 export function toLocalInput(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-/** datetime-local 值("YYYY-MM-DDTHH:mm") → 后端格式(补秒)。 */
+/** datetime-local value ("YYYY-MM-DDTHH:mm") → backend format (seconds appended). */
 export function datetimeLocalToBackend(v: string): string {
   if (!v) return v;
   return v.length === 16 ? `${v}:00` : v;
 }
 
-/** 后端时间 → datetime-local 输入值。 */
+/** Backend time string → datetime-local input value. */
 export function backendToDatetimeLocal(v: string | null | undefined): string {
   const d = parseTime(v);
   if (!d) return '';
   return toLocalInput(d).slice(0, 16);
 }
 
-/** 展示用日期（YYYY-MM-DD HH:mm）。 */
+/** Display date-time (YYYY-MM-DD HH:mm). */
 export function fmtDateTime(v: string | null | undefined): string {
   const d = parseTime(v);
   if (!d) return '—';

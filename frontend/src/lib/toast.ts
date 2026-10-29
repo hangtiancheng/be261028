@@ -1,4 +1,4 @@
-/** 全局 toast：模块级 store + <x-toast-host> 渲染，motion 负责进出场动画。 */
+/** Global toasts: module-level store rendered by <x-toast-host>; motion handles the enter/leave animations. */
 
 export type ToastKind = 'success' | 'error' | 'info';
 

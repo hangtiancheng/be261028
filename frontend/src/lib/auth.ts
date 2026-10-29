@@ -1,4 +1,4 @@
-/** 登录态：与旧版一致，纯前端 cookie（username，1 天有效期），无真实鉴权。 */
+/** Login state: front-end-only cookie (username, 1-day expiry) for parity with the legacy app; no real authentication. */
 
 export function getUsername(): string | null {
   const match = document.cookie

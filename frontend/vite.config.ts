@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
-// be261028 前端构建配置：
-// - JSX 走 @yukino.js/lit-jsx 的 automatic runtime（esbuild）
-// - TailwindCSS v4 通过官方 Vite 插件接入
-// - 开发期将 /api 代理到本机 Go 网关(8091)；生产由网关直接服务 dist（同源）
+// be261028 frontend build configuration:
+// - JSX is compiled with the @yukino.js/lit-jsx automatic runtime (esbuild).
+// - TailwindCSS v4 is wired in through the official Vite plugin.
+// - During development /api is proxied to the local Go gateway (8091);
+//   in production the gateway serves dist/ statically (same origin).
 export default defineConfig({
   plugins: [tailwindcss()],
   esbuild: {

@@ -30,112 +30,112 @@ import (
 func main() {
 	cfg, err := bootstrap.LoadConfig(bootstrap.ConfigPath("configs/trade.yaml"))
 	if err != nil {
-		log.Fatalf("[trade] 加载配置失败: %v", err)
+		log.Fatalf("[trade] failed to load config: %v", err)
 	}
-	log.Printf("[trade] 启动服务 name:%s rpc:%s metrics:%s", cfg.Service.Name, cfg.Service.RPCAddr, cfg.Service.MetricsAddr)
+	log.Printf("[trade] starting service name:%s rpc:%s metrics:%s", cfg.Service.Name, cfg.Service.RPCAddr, cfg.Service.MetricsAddr)
 
 	ctx := bootstrap.SignalContext()
 
 	// MySQL
 	gdb, err := db.New(cfg.MySQL)
 	if err != nil {
-		log.Fatalf("[trade] 连接 MySQL 失败: %v", err)
+		log.Fatalf("[trade] failed to connect to MySQL: %v", err)
 	}
 	defer db.Close(gdb) //nolint:errcheck
 
 	// Redis
 	redis, err := redisx.New(cfg.Redis)
 	if err != nil {
-		log.Fatalf("[trade] 连接 Redis 失败: %v", err)
+		log.Fatalf("[trade] failed to connect to Redis: %v", err)
 	}
 	defer redis.Close()
 
-	// Kafka 主题（broker 未开启自动创建，启动时显式创建）
+	// Kafka topics (the broker has auto-create disabled, so create them explicitly at startup).
 	if err := kafkax.EnsureTopics(cfg.Kafka.Brokers, cfg.Kafka.ClientID,
 		[]string{cfg.Kafka.TopicTeamSuccess, cfg.Kafka.TopicTeamRefund}); err != nil {
-		log.Fatalf("[trade] 创建 Kafka 主题失败: %v", err)
+		log.Fatalf("[trade] failed to create Kafka topics: %v", err)
 	}
 
 	// Kafka producer
 	producer, err := kafkax.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.ClientID)
 	if err != nil {
-		log.Fatalf("[trade] 创建 Kafka 生产者失败: %v", err)
+		log.Fatalf("[trade] failed to create the Kafka producer: %v", err)
 	}
 	defer producer.Close()
 
-	// DCC（订阅动态配置）
+	// DCC (subscribe to dynamic config).
 	dccService := dcc.New(cfg.DCC.Topic, cfg.DCC.Defaults)
 	go dccService.Subscribe(context.Background(), redis)
 
-	// DAO + 仓储
+	// DAO + repository.
 	d := dao.New()
 	tradeRepo := trade.NewTradeRepository(gdb, d, redis, dccService, cfg.Kafka.TopicTeamSuccess, cfg.Kafka.TopicTeamRefund)
 
-	// activity RPC 客户端（锁单试算回调）
+	// activity RPC client (lock-order trial callback).
 	activityConn, err := yukinorpc.Dial(cfg.RPC.ActivityTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
-		log.Fatalf("[trade] 连接 activity 服务失败: %v", err)
+		log.Fatalf("[trade] failed to connect to the activity service: %v", err)
 	}
 	defer activityConn.Close()
 	activityCli := rpc.NewActivityClient(activityConn)
 
-	// 交易端口 + 任务服务
+	// Trade port + task service.
 	port := trade.NewTradePort(redis, producer, cfg.Notify.CallbackTimeout, cfg.Notify.HTTPLockWait, cfg.Notify.HTTPLockLease)
 	taskService := trade.NewTradeTaskService(tradeRepo, port, cfg.Notify.MaxRetry)
 
-	// 规则链 + 策略
+	// Rule chains + strategies.
 	lockChain := trade.NewLockRuleChain(tradeRepo)
 	settlementChain := trade.NewSettlementRuleChain(tradeRepo)
 	strategies := trade.NewRefundStrategies(tradeRepo, taskService)
 	refundChain := trade.NewRefundRuleChain(tradeRepo, strategies)
 
-	// 领域服务
+	// Domain services.
 	lockService := trade.NewTradeLockOrderService(tradeRepo, lockChain)
 	settlementService := trade.NewTradeSettlementOrderService(tradeRepo, settlementChain, taskService)
 	refundService := trade.NewTradeRefundOrderService(refundChain, strategies)
 
-	// RPC 服务
+	// RPC service.
 	tradeServer := rpc.NewTradeServer(lockService, settlementService, refundService, activityCli)
 	rpcServer, err := bootstrap.ServeRPC(cfg.Service.RPCAddr, api.TradeServiceName, tradeServer)
 	if err != nil {
-		log.Fatalf("[trade] 启动 RPC 服务失败: %v", err)
+		log.Fatalf("[trade] failed to start the RPC service: %v", err)
 	}
 
-	// Kafka 消费者：team_refund -> 恢复锁单库存（缺陷修复）；team_success -> 记录
+	// Kafka consumer: team_refund -> restore locked team stock (defect fix); team_success -> log.
 	consumer, err := kafkax.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.GroupID, cfg.Kafka.ClientID,
 		[]string{cfg.Kafka.TopicTeamRefund, cfg.Kafka.TopicTeamSuccess})
 	if err != nil {
-		log.Fatalf("[trade] 创建 Kafka 消费者失败: %v", err)
+		log.Fatalf("[trade] failed to create the Kafka consumer: %v", err)
 	}
 	consumer.SetOnError(func(topic string, value []byte, err error) {
-		log.Printf("[trade] Kafka 消费失败 topic:%s value:%s err:%v", topic, string(value), err)
+		log.Printf("[trade] Kafka consume failed topic:%s value:%s err:%v", topic, string(value), err)
 	})
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	go func() {
 		if err := consumer.Run(consumerCtx, messageHandler(refundService, cfg)); err != nil {
-			log.Printf("[trade] Kafka 消费者退出: %v", err)
+			log.Printf("[trade] Kafka consumer exited: %v", err)
 		}
 	}()
 
-	// 定时回调通知任务
+	// Scheduled callback notify job.
 	jobCtx, cancelJob := context.WithCancel(context.Background())
 	go runNotifyJob(jobCtx, cfg, redis, taskService)
 
-	// 指标/健康
+	// Metrics / health.
 	metricsSrv, err := metrics.Server(cfg.Service.MetricsAddr)
 	if err != nil {
-		log.Fatalf("[trade] 启动 metrics 服务失败: %v", err)
+		log.Fatalf("[trade] failed to start the metrics service: %v", err)
 	}
 
-	// 等待退出信号
+	// Wait for the shutdown signal.
 	<-ctx.Done()
-	log.Printf("[trade] 收到退出信号，开始优雅停机")
+	log.Printf("[trade] shutdown signal received, starting graceful stop")
 	cancelJob()
 	cancelConsumer()
 	consumer.Close()
 	rpcServer.GracefulStop()
 	metrics.Shutdown(metricsSrv)
-	log.Printf("[trade] 已停机")
+	log.Printf("[trade] stopped")
 }
 
 // messageHandler dispatches consumed Kafka messages by topic.
@@ -145,14 +145,14 @@ func messageHandler(refundService *trade.TradeRefundOrderService, cfg *config.Co
 		case cfg.Kafka.TopicTeamRefund:
 			var msg trade.TeamRefundSuccess
 			if err := json.Unmarshal(value, &msg); err != nil {
-				log.Printf("[trade] 退单消息解析失败 value:%s err:%v", string(value), err)
-				return nil // 跳过畸形消息，避免毒消息循环
+				log.Printf("[trade] failed to parse the refund message value:%s err:%v", string(value), err)
+				return nil // skip malformed messages to avoid a poison-message loop
 			}
 			metrics.KafkaMessagesTotal.WithLabelValues(topic, "consume").Inc()
-			// 恢复锁单库存（含瞬时错误重试，处理本身幂等）
+			// Restore locked team stock (retries transient errors; the operation itself is idempotent).
 			return restoreWithRetry(ctx, refundService, &msg)
 		case cfg.Kafka.TopicTeamSuccess:
-			log.Printf("[trade] 接收成团消息:%s", string(value))
+			log.Printf("[trade] received team-success message:%s", string(value))
 			metrics.KafkaMessagesTotal.WithLabelValues(topic, "consume").Inc()
 		}
 		return nil
@@ -166,7 +166,7 @@ func restoreWithRetry(ctx context.Context, refundService *trade.TradeRefundOrder
 	for attempt := 0; attempt < 3; attempt++ {
 		if err := refundService.RestoreTeamLockStock(ctx, msg); err != nil {
 			lastErr = err
-			log.Printf("[trade] 恢复锁单库存失败(第%d次) teamId:%s orderId:%s err:%v", attempt+1, msg.TeamId, msg.OrderId, err)
+			log.Printf("[trade] failed to restore locked team stock (attempt %d) teamId:%s orderId:%s err:%v", attempt+1, msg.TeamId, msg.OrderId, err)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -193,7 +193,7 @@ func runNotifyJob(ctx context.Context, cfg *config.Config, redis *redisx.RedisSe
 			lockCtx, cancel := context.WithTimeout(ctx, cfg.Notify.CallbackTimeout+30*time.Second)
 			acquired, err := lock.TryLock(lockCtx, 3*time.Second, 2*time.Minute)
 			if err != nil {
-				log.Printf("[trade] 定时任务抢锁失败: %v", err)
+				log.Printf("[trade] scheduled job failed to acquire the lock: %v", err)
 				cancel()
 				continue
 			}
@@ -203,12 +203,12 @@ func runNotifyJob(ctx context.Context, cfg *config.Config, redis *redisx.RedisSe
 			}
 			result, err := taskService.ExecNotifyJob(lockCtx)
 			if err != nil {
-				log.Printf("[trade] 定时任务，回调通知拼团任务失败: %v", err)
+				log.Printf("[trade] scheduled job: notify group-buy task failed: %v", err)
 			} else {
-				log.Printf("[trade] 定时任务，回调通知完成 result:%v", result)
+				log.Printf("[trade] scheduled job: notify complete result:%v", result)
 			}
 			if err := lock.Unlock(lockCtx); err != nil {
-				log.Printf("[trade] 定时任务释放锁失败: %v", err)
+				log.Printf("[trade] scheduled job failed to release the lock: %v", err)
 			}
 			cancel()
 		}

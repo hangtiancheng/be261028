@@ -18,7 +18,7 @@ func (d *DAO) QueryGroupBuyActivityList(ctx context.Context, tx *gorm.DB) ([]*Gr
 }
 
 // QueryValidGroupBuyActivityId mirrors queryValidGroupBuyActivityId: only
-// status = 1 (生效) activities are returned.
+// status = 1 (Effective) activities are returned.
 func (d *DAO) QueryValidGroupBuyActivityId(ctx context.Context, tx *gorm.DB, activityId int64) (*GroupBuyActivity, error) {
 	var a GroupBuyActivity
 	err := tx.WithContext(ctx).

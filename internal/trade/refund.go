@@ -30,70 +30,70 @@ func (b *baseRefundStrategy) sendRefundNotifyMessage(notifyTask *NotifyTaskEntit
 	asyncExec(func() {
 		result, err := b.task.ExecNotifyJobTask(context.Background(), notifyTask)
 		if err != nil {
-			log.Printf("回调通知交易退单失败(%s) result:%v err:%v", refundType, result, err)
+			log.Printf("[trade] refund callback notify failed (%s) result:%v err:%v", refundType, result, err)
 			return
 		}
-		log.Printf("回调通知交易退单(%s) result:%v", refundType, result)
+		log.Printf("[trade] refund callback notify (%s) result:%v", refundType, result)
 	})
 }
 
 // doReverseStock mirrors AbstractRefundOrderStrategy.doReverseStock.
 func (b *baseRefundStrategy) doReverseStock(ctx context.Context, msg *TeamRefundSuccess, refundType string) error {
-	log.Printf("退单；恢复锁单量 - %s %s %d %s", refundType, msg.UserId, msg.ActivityId, msg.TeamId)
+	log.Printf("[trade] refund; restoring lock stock - %s userId:%s activityId:%d teamId:%s", refundType, msg.UserId, msg.ActivityId, msg.TeamId)
 	recoveryTeamStockKey := GenerateRecoveryTeamStockKey(msg.ActivityId, msg.TeamId)
 	return b.repo.Refund2AddRecovery(ctx, recoveryTeamStockKey, msg.OrderId)
 }
 
-// Unpaid2RefundStrategy mirrors unpaid2RefundStrategy (未支付，未成团).
+// Unpaid2RefundStrategy mirrors unpaid2RefundStrategy (unpaid, team not formed).
 type Unpaid2RefundStrategy struct{ baseRefundStrategy }
 
 // RefundOrder decrements the lock count and records the refund notify task.
 func (s *Unpaid2RefundStrategy) RefundOrder(ctx context.Context, order *TradeRefundOrderEntity) error {
-	log.Printf("退单；未支付，未成团 userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
+	log.Printf("[trade] refund; unpaid, team not formed userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
 	notifyTask, err := s.repo.Unpaid2Refund(ctx, BuildUnpaid2RefundAggregate(order, -1))
 	if err != nil {
 		return err
 	}
-	s.sendRefundNotifyMessage(notifyTask, "未支付，未成团")
+	s.sendRefundNotifyMessage(notifyTask, "unpaid, team not formed")
 	return nil
 }
 
 // ReverseStock restores the lock stock (there was a lock record to recover).
 func (s *Unpaid2RefundStrategy) ReverseStock(ctx context.Context, msg *TeamRefundSuccess) error {
-	return s.doReverseStock(ctx, msg, "未支付，未成团，但有锁单记录，要恢复锁单库存")
+	return s.doReverseStock(ctx, msg, "unpaid, team not formed, but a lock record exists; restoring lock stock")
 }
 
-// Paid2RefundStrategy mirrors paid2RefundStrategy (已支付，未成团).
+// Paid2RefundStrategy mirrors paid2RefundStrategy (paid, team not formed).
 type Paid2RefundStrategy struct{ baseRefundStrategy }
 
 // RefundOrder decrements lock and complete counts and records the refund notify task.
 func (s *Paid2RefundStrategy) RefundOrder(ctx context.Context, order *TradeRefundOrderEntity) error {
-	log.Printf("退单；已支付，未成团 userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
+	log.Printf("[trade] refund; paid, team not formed userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
 	notifyTask, err := s.repo.Paid2Refund(ctx, BuildPaid2RefundAggregate(order, -1, -1))
 	if err != nil {
 		return err
 	}
-	s.sendRefundNotifyMessage(notifyTask, "已支付，未成团")
+	s.sendRefundNotifyMessage(notifyTask, "paid, team not formed")
 	return nil
 }
 
 // ReverseStock restores the lock stock.
 func (s *Paid2RefundStrategy) ReverseStock(ctx context.Context, msg *TeamRefundSuccess) error {
-	return s.doReverseStock(ctx, msg, "已支付，未成团，但有锁单记录，要恢复锁单库存")
+	return s.doReverseStock(ctx, msg, "paid, team not formed, but a lock record exists; restoring lock stock")
 }
 
-// PaidTeam2RefundStrategy mirrors paidTeam2RefundStrategy (已支付，已成团).
+// PaidTeam2RefundStrategy mirrors paidTeam2RefundStrategy (paid, team formed).
 type PaidTeam2RefundStrategy struct{ baseRefundStrategy }
 
 // RefundOrder refunds a formed-team member; the last member failing the team marks
 // the team failed, otherwise it stays complete-with-refund.
 func (s *PaidTeam2RefundStrategy) RefundOrder(ctx context.Context, order *TradeRefundOrderEntity) error {
-	log.Printf("退单；已支付，已成团 userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
+	log.Printf("[trade] refund; paid, team formed userId:%s teamId:%s orderId:%s", order.UserId, order.TeamId, order.OrderId)
 	team, err := s.repo.QueryGroupBuyTeamByTeamId(ctx, order.TeamId)
 	if err != nil {
 		return err
 	}
-	// 最后一笔也退单，则更新拼团订单为失败
+	// If the last member also refunds, mark the team failed.
 	teamStatus := types.GroupBuyOrderComplete
 	if team.CompleteCount == 1 {
 		teamStatus = types.GroupBuyOrderFail
@@ -102,13 +102,13 @@ func (s *PaidTeam2RefundStrategy) RefundOrder(ctx context.Context, order *TradeR
 	if err != nil {
 		return err
 	}
-	s.sendRefundNotifyMessage(notifyTask, "已支付，已成团")
+	s.sendRefundNotifyMessage(notifyTask, "paid, team formed")
 	return nil
 }
 
 // ReverseStock is a no-op for formed teams (the team window has ended).
 func (s *PaidTeam2RefundStrategy) ReverseStock(ctx context.Context, msg *TeamRefundSuccess) error {
-	log.Printf("退单；已支付、已成团，队伍组队结束，不需要恢复锁单量 %s %d %s", msg.UserId, msg.ActivityId, msg.TeamId)
+	log.Printf("[trade] refund; paid, team formed; team window ended, no lock stock to restore userId:%s activityId:%d teamId:%s", msg.UserId, msg.ActivityId, msg.TeamId)
 	return nil
 }
 
@@ -166,13 +166,13 @@ func (c *RefundRuleChain) Apply(ctx context.Context, cmd *TradeRefundCommandEnti
 // REPEAT branch in uniqueRefundNode unreachable. Only the missing-order check is
 // kept here; duplicate refunds are handled idempotently by uniqueRefundNode.
 func (c *RefundRuleChain) dataNode(ctx context.Context, cmd *TradeRefundCommandEntity, dc *refundDynamicContext) (*TradeRefundBehaviorEntity, error) {
-	log.Printf("逆向流程-退单操作，数据加载节点 userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] reverse flow - refund, data load node userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	order, err := c.repo.QueryMarketPayOrderEntityByOutTradeNo(ctx, cmd.UserId, cmd.OutTradeNo)
 	if err != nil {
 		return nil, err
 	}
 	if order == nil {
-		log.Printf("不存在的外部交易单号或用户已退单，无法进行退款业务:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+		log.Printf("[trade] unknown outTradeNo or already refunded, cannot refund userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 		return nil, types.NewAppError(types.ResponseE0104)
 	}
 	team, err := c.repo.QueryGroupBuyTeamByTeamId(ctx, order.TeamId)
@@ -187,10 +187,10 @@ func (c *RefundRuleChain) dataNode(ctx context.Context, cmd *TradeRefundCommandE
 // uniqueRefundNode mirrors UniqueRefundNodeFilter: an already-refunded order is an
 // idempotent repeat, not an error.
 func (c *RefundRuleChain) uniqueRefundNode(ctx context.Context, cmd *TradeRefundCommandEntity, dc *refundDynamicContext) (*TradeRefundBehaviorEntity, error) {
-	log.Printf("逆向流程-退单操作，重复退单检查 userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] reverse flow - refund, duplicate refund check userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	order := dc.marketPayOrderEntity
 	if order.TradeOrderStatus == types.TradeOrderClose {
-		log.Printf("逆向流程，退单操作(幂等-重复退单) userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+		log.Printf("[trade] reverse flow - refund (idempotent, duplicate) userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 		return &TradeRefundBehaviorEntity{
 			UserId:   cmd.UserId,
 			OrderId:  order.OrderId,
@@ -204,7 +204,7 @@ func (c *RefundRuleChain) uniqueRefundNode(ctx context.Context, cmd *TradeRefund
 // refundOrderNode mirrors RefundOrderNodeFilter: pick the strategy by the
 // (team status, order status) pair and execute the refund.
 func (c *RefundRuleChain) refundOrderNode(ctx context.Context, cmd *TradeRefundCommandEntity, dc *refundDynamicContext) (*TradeRefundBehaviorEntity, error) {
-	log.Printf("逆向流程-退单操作，退单策略处理 userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] reverse flow - refund, strategy dispatch userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	order := dc.marketPayOrderEntity
 	team := dc.groupBuyTeamEntity
 	refundType, err := types.GetRefundStrategy(team.Status, order.TradeOrderStatus)
@@ -213,7 +213,7 @@ func (c *RefundRuleChain) refundOrderNode(ctx context.Context, cmd *TradeRefundC
 	}
 	strategy := c.strategies[refundType.Strategy()]
 	if strategy == nil {
-		return nil, fmt.Errorf("不存在退单策略: %s", refundType.Strategy())
+		return nil, fmt.Errorf("no refund strategy registered: %s", refundType.Strategy())
 	}
 	if err := strategy.RefundOrder(ctx, &TradeRefundOrderEntity{
 		UserId:     cmd.UserId,
@@ -237,7 +237,7 @@ func asyncExec(fn func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[trade] 异步任务 panic: %v", r)
+				log.Printf("[trade] async task panic: %v", r)
 			}
 		}()
 		fn()

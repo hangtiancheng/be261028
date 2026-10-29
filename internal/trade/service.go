@@ -21,20 +21,20 @@ func NewTradeLockOrderService(repo *TradeRepository, lockChain *LockRuleChain) *
 
 // QueryNoPayMarketPayOrderByOutTradeNo mirrors the legacy idempotency lookup.
 func (s *TradeLockOrderService) QueryNoPayMarketPayOrderByOutTradeNo(ctx context.Context, userId, outTradeNo string) (*MarketPayOrderEntity, error) {
-	log.Printf("拼团交易-查询未支付营销订单:%s outTradeNo:%s", userId, outTradeNo)
+	log.Printf("[trade] lock order - query unpaid marketing order userId:%s outTradeNo:%s", userId, outTradeNo)
 	return s.repo.QueryMarketPayOrderEntityByOutTradeNo(ctx, userId, outTradeNo)
 }
 
 // QueryGroupBuyProgress mirrors the legacy progress lookup.
 func (s *TradeLockOrderService) QueryGroupBuyProgress(ctx context.Context, teamId string) (*GroupBuyProgressVO, error) {
-	log.Printf("拼团交易-查询拼单进度:%s", teamId)
+	log.Printf("[trade] lock order - query group-buy progress teamId:%s", teamId)
 	return s.repo.QueryGroupBuyProgress(ctx, teamId)
 }
 
 // LockMarketPayOrder mirrors the legacy lockMarketPayOrder: run the rule chain,
 // build the aggregate, persist, and recover Redis stock on failure.
 func (s *TradeLockOrderService) LockMarketPayOrder(ctx context.Context, user *UserEntity, payActivity *PayActivityEntity, payDiscount *PayDiscountEntity) (*MarketPayOrderEntity, error) {
-	log.Printf("拼团交易-锁定营销优惠支付订单:%s activityId:%d goodsId:%s", user.UserId, payActivity.ActivityId, payDiscount.GoodsId)
+	log.Printf("[trade] lock order - locking marketing discount pay order userId:%s activityId:%d goodsId:%s", user.UserId, payActivity.ActivityId, payDiscount.GoodsId)
 	back, err := s.lockChain.Apply(ctx, &TradeLockRuleCommandEntity{
 		UserId:     user.UserId,
 		ActivityId: payActivity.ActivityId,
@@ -51,9 +51,9 @@ func (s *TradeLockOrderService) LockMarketPayOrder(ctx context.Context, user *Us
 	}
 	entity, err := s.repo.LockMarketPayOrder(ctx, agg)
 	if err != nil {
-		// 记录失败恢复量
+		// Record the failed-occupancy recovery.
 		if recErr := s.repo.RecoveryTeamStock(ctx, back.RecoveryTeamStockKey, payActivity.ValidTime); recErr != nil {
-			log.Printf("拼团交易-恢复组队库存失败 key:%s err:%v", back.RecoveryTeamStockKey, recErr)
+			log.Printf("[trade] lock order - failed to restore team stock key:%s err:%v", back.RecoveryTeamStockKey, recErr)
 		}
 		return nil, err
 	}
@@ -74,8 +74,8 @@ func NewTradeSettlementOrderService(repo *TradeRepository, chain *SettlementRule
 
 // SettlementMarketPayOrder mirrors the legacy settlementMarketPayOrder.
 func (s *TradeSettlementOrderService) SettlementMarketPayOrder(ctx context.Context, paySuccess *TradePaySuccessEntity) (*TradePaySettlementEntity, error) {
-	log.Printf("拼团交易-支付订单结算:%s outTradeNo:%s", paySuccess.UserId, paySuccess.OutTradeNo)
-	// 1. 结算规则过滤
+	log.Printf("[trade] settlement - settling pay order userId:%s outTradeNo:%s", paySuccess.UserId, paySuccess.OutTradeNo)
+	// 1. Settlement rule filtering.
 	back, err := s.settlementChain.Apply(ctx, &TradeSettlementRuleCommandEntity{
 		Source:       paySuccess.Source,
 		Channel:      paySuccess.Channel,
@@ -86,7 +86,8 @@ func (s *TradeSettlementOrderService) SettlementMarketPayOrder(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	// 缺陷修复：重复结算回调幂等返回成功（旧版会重复累加成团数量）
+	// Defect fix: a repeat settlement callback returns success idempotently (the
+	// legacy version double-counted the team's complete count).
 	if back.AlreadySettled {
 		return &TradePaySettlementEntity{
 			Source:     paySuccess.Source,
@@ -97,7 +98,7 @@ func (s *TradeSettlementOrderService) SettlementMarketPayOrder(ctx context.Conte
 			OutTradeNo: paySuccess.OutTradeNo,
 		}, nil
 	}
-	// 2. 查询组团信息
+	// 2. Query team info.
 	team := &GroupBuyTeamEntity{
 		TeamId:         back.TeamId,
 		ActivityId:     back.ActivityId,
@@ -109,30 +110,30 @@ func (s *TradeSettlementOrderService) SettlementMarketPayOrder(ctx context.Conte
 		ValidEndTime:   back.ValidEndTime,
 		NotifyConfigVO: back.NotifyConfigVO,
 	}
-	// 3. 构建聚合对象
+	// 3. Build the aggregate.
 	agg := &GroupBuyTeamSettlementAggregate{
 		UserEntity:            &UserEntity{UserId: paySuccess.UserId},
 		GroupBuyTeamEntity:    team,
 		TradePaySuccessEntity: paySuccess,
 	}
-	// 4. 拼团交易结算
+	// 4. Group-buy trade settlement.
 	notifyTask, err := s.repo.SettlementMarketPayOrder(ctx, agg)
 	if err != nil {
 		return nil, err
 	}
-	// 5. 组队回调处理（异步；失败有定时任务补偿）
+	// 5. Team callback handling (async; a scheduled job compensates for failures).
 	if notifyTask != nil {
 		task := s.task
 		asyncExec(func() {
 			result, err := task.ExecNotifyJobTask(context.Background(), notifyTask)
 			if err != nil {
-				log.Printf("回调通知拼团完结失败 result:%v err:%v", result, err)
+				log.Printf("[trade] settlement - notify team-completion callback failed result:%v err:%v", result, err)
 				return
 			}
-			log.Printf("回调通知拼团完结 result:%v", result)
+			log.Printf("[trade] settlement - notify team-completion callback result:%v", result)
 		})
 	}
-	// 6. 返回结算信息
+	// 6. Return the settlement result.
 	return &TradePaySettlementEntity{
 		Source:     paySuccess.Source,
 		Channel:    paySuccess.Channel,
@@ -156,7 +157,7 @@ func NewTradeRefundOrderService(refundChain *RefundRuleChain, strategies map[str
 
 // RefundOrder mirrors the legacy refundOrder (forward refund flow).
 func (s *TradeRefundOrderService) RefundOrder(ctx context.Context, cmd *TradeRefundCommandEntity) (*TradeRefundBehaviorEntity, error) {
-	log.Printf("逆向流程，退单操作 userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] reverse flow - refund userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	return s.refundChain.Apply(ctx, cmd)
 }
 
@@ -165,14 +166,14 @@ func (s *TradeRefundOrderService) RefundOrder(ctx context.Context, cmd *TradeRef
 // refund stock-recovery loop was broken; the be261028 trade service consumes the
 // team-refund Kafka topic and invokes this to close the loop.
 func (s *TradeRefundOrderService) RestoreTeamLockStock(ctx context.Context, msg *TeamRefundSuccess) error {
-	log.Printf("逆向流程，恢复锁单量 userId:%s activityId:%d teamId:%s", msg.UserId, msg.ActivityId, msg.TeamId)
+	log.Printf("[trade] reverse flow - restoring lock stock userId:%s activityId:%d teamId:%s", msg.UserId, msg.ActivityId, msg.TeamId)
 	refundType, err := types.GetRefundTypeByCode(msg.Type)
 	if err != nil {
 		return err
 	}
 	strategy := s.strategies[refundType.Strategy()]
 	if strategy == nil {
-		return fmt.Errorf("不存在退单策略: %s", refundType.Strategy())
+		return fmt.Errorf("no refund strategy registered: %s", refundType.Strategy())
 	}
 	return strategy.ReverseStock(ctx, msg)
 }

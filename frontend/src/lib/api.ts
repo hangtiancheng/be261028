@@ -1,8 +1,13 @@
 /**
- * 后端 API 客户端。
- * 开发环境经 Vite 代理、生产环境由 Go 网关同源服务，均使用相对路径 /api。
- * 统一响应: { code, info, data }；code "0000"=成功（admin 接口为 SUCCESS/ERROR）。
+ * Backend API client.
+ * In development requests go through the Vite proxy; in production the Go
+ * gateway serves the app and the API from the same origin — both use the
+ * relative /api base. Every response shares the envelope { code, info, data };
+ * code "0000" means success for gbm endpoints (admin endpoints use
+ * SUCCESS/ERROR instead).
  */
+
+import { toLocalInput } from './utils';
 
 export interface ApiResponse<T = unknown> {
   code: string;
@@ -37,7 +42,7 @@ export interface TeamStatistic {
   allTeamUserCount: number;
 }
 
-/** 拼团优惠（折扣）明细 —— index 接口当前未下发，存在时直接渲染。 */
+/** Group-buy discount details — currently omitted by the index endpoint; rendered when present. */
 export interface GroupBuyDiscount {
   discountName?: string;
   discountDesc?: string;
@@ -50,31 +55,32 @@ export interface MarketConfig {
   goods: Goods;
   teamList: Team[] | null;
   teamStatistic: TeamStatistic;
-  /** 与旧版 Java GoodsMarketResponseDTO 对齐的可选字段；网关当前省略。 */
+  /** Optional field aligned with the legacy Java GoodsMarketResponseDTO; the gateway omits it today. */
   groupBuyActivityDiscountVO?: { groupBuyDiscount?: GroupBuyDiscount } | null;
 }
 
-/** 营销计划 code → 中文名（ZJ/MJ/N元购/ZK）。 */
+/** Marketing plan code → English label (ZJ / MJ / fixed-price buy / ZK). */
 export const MARKET_PLAN_LABELS: Record<string, string> = {
-  ZJ: '直减',
-  MJ: '满减',
-  N: 'N元购',
-  ZK: '折扣',
+  ZJ: 'Direct deduction',
+  MJ: 'Threshold discount',
+  N: 'Fixed-price buy',
+  ZK: 'Percentage off',
 };
 
 /**
- * 优惠表达式兜底渲染：网关 index 响应不含折扣明细（DTO 有意省略），
- * 由试算结果（原价/直降/到手价）反推出等效 ZJ / ZK 表达式。
+ * Discount expression fallback renderer: the gateway index response carries no
+ * discount details (the DTO omits them on purpose), so an equivalent ZJ / ZK
+ * expression is derived from the trial prices (original / deduction / payable).
  */
 export function deriveDiscountExpr(goods: Goods): { plan: string; expr: string; note: string } {
   const original = Number(goods.originalPrice) || 0;
   const pay = Number(goods.payPrice) || 0;
   const deduction = Math.max(0, original - pay);
   if (original > 0 && pay > 0 && pay < original) {
-    const zhe = ((pay / original) * 10).toFixed(1).replace(/\.0$/, '');
-    return { plan: 'ZJ', expr: `直减 ${deduction.toFixed(2)}`, note: `等效 ${zhe} 折` };
+    const pct = Math.round((pay / original) * 100);
+    return { plan: 'ZJ', expr: `Direct deduction ¥${deduction.toFixed(2)}`, note: `You pay ${pct}% of the list price` };
   }
-  return { plan: 'ZJ', expr: '直减 0.00', note: '无额外优惠' };
+  return { plan: 'ZJ', expr: 'Direct deduction ¥0.00', note: 'No extra discount' };
 }
 
 export interface LockOrderResult {
@@ -162,31 +168,34 @@ const post = <T>(url: string, body: unknown) =>
 
 const get = <T>(url: string) => request<T>(url, { method: 'GET' });
 
-/** 业务错误码 → 友好提示 */
+/** Business error code → user-friendly English message. */
 export const ERROR_MESSAGES: Record<string, string> = {
-  '0001': '服务开小差了，请稍后再试',
-  '0002': '参数不完整，请检查后重试',
-  '0003': '重复提交被拦截',
-  '0006': '操作太频繁啦，歇一秒再试',
-  E0001: '优惠计划暂不可用',
-  E0002: '该商品暂无拼团活动',
-  E0003: '活动火爆维护中（已降级）',
-  E0004: '你暂不在本次活动范围内',
-  E0005: '手慢了，该团刚好满员',
-  E0006: '该团已满员，开个新团吧',
-  E0007: '本活动仅限指定人群参与',
-  E0008: '该团库存不足，开个新团吧',
-  E0101: '活动未生效',
-  E0102: '不在活动有效期内',
-  E0103: '你参与该活动的次数已达上限',
-  E0104: '订单不存在或已退单',
-  E0105: '该渠道已被拦截',
-  E0106: '支付时间超出拼团有效期',
-  E0107: '已退过单，请勿重复退单',
+  '0001': 'Something went wrong on our side. Please try again later.',
+  '0002': 'Invalid or incomplete parameters. Please review and retry.',
+  '0003': 'Duplicate submission rejected.',
+  '0004': 'Nothing changed — no matching records were updated.',
+  '0005': 'Upstream service call failed. Please retry.',
+  '0006': 'Too many requests. Please wait a moment and try again.',
+  E0001: 'No discount plan is available right now.',
+  E0002: 'This item has no active group-buy campaign.',
+  E0003: 'Group-buy pricing is temporarily paused for maintenance.',
+  E0004: 'You are outside the rollout range for this campaign.',
+  E0005: 'Too late — this team just filled up.',
+  E0006: 'This team is full. Start a new one instead.',
+  E0007: 'This campaign is restricted to specific user groups.',
+  E0008: 'Team stock is exhausted. Please start a new team later.',
+  E0101: 'The campaign is not effective yet.',
+  E0102: 'Outside the campaign validity window.',
+  E0103: 'You have reached the participation limit for this campaign.',
+  E0104: 'Order not found, or it has already been refunded.',
+  E0105: 'This source/channel combination is blocked.',
+  E0106: 'Payment time is outside the team validity window.',
+  E0107: 'This order was already refunded.',
+  UN_ERROR: 'Unknown error. Please try again later.',
 };
 
 export function friendlyError(code: string, info: string): string {
-  return ERROR_MESSAGES[code] ?? `${info || '未知错误'} (${code})`;
+  return ERROR_MESSAGES[code] ?? `${info || 'Unknown error'} (${code})`;
 }
 
 export const api = {
@@ -223,7 +232,9 @@ export const api = {
       channel: 'c01',
       userId,
       outTradeNo,
-      outTradeTime: new Date().toISOString(),
+      // The backend expects naive local "YYYY-MM-DDTHH:mm:ss" (JSONTime),
+      // which must fall before the team's validEndTime.
+      outTradeTime: toLocalInput(new Date()),
     }),
 
   refund: (userId: string, outTradeNo: string) =>

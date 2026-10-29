@@ -1,8 +1,8 @@
-# be261028 gateway 服务配置
+# be261028 gateway service configuration
 service:
   name: gateway
-  httpAddr: "127.0.0.1:8091"   # 对外 HTTP 端口（与旧项目一致），/metrics 与 /health 同端口
-  webDir: "frontend/dist"       # 新前端（Vite+Lit+lit-jsx+Tailwind）构建产物（相对工作目录）
+  httpAddr: "127.0.0.1:8091"   # public HTTP port (same as the legacy project); /metrics and /health share it
+  webDir: "frontend/dist"       # build output of the new frontend (Vite+Lit+lit-jsx+Tailwind), relative to the working directory
 
 rpc:
   activityTarget: "127.0.0.1:19001"

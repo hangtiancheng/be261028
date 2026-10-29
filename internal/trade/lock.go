@@ -46,18 +46,18 @@ func (c *LockRuleChain) Apply(ctx context.Context, cmd *TradeLockRuleCommandEnti
 
 // activityUsability mirrors ActivityUsabilityRuleFilter (status + time window).
 func (c *LockRuleChain) activityUsability(ctx context.Context, cmd *TradeLockRuleCommandEntity, dc *lockDynamicContext) (*TradeLockRuleFilterBackEntity, error) {
-	log.Printf("交易规则过滤-活动的可用性校验%s activityId:%d", cmd.UserId, cmd.ActivityId)
+	log.Printf("[trade] lock rule filter - activity usability check userId:%s activityId:%d", cmd.UserId, cmd.ActivityId)
 	activity, err := c.repo.QueryGroupBuyActivityEntityByActivityId(ctx, cmd.ActivityId)
 	if err != nil {
 		return nil, err
 	}
 	if activity.Status != types.ActivityStatusEffective {
-		log.Printf("活动的可用性校验，非生效状态 activityId:%d", cmd.ActivityId)
+		log.Printf("[trade] activity usability check failed, not in effective status activityId:%d", cmd.ActivityId)
 		return nil, types.NewAppError(types.ResponseE0101)
 	}
 	now := types.Now()
 	if now.Before(activity.StartTime) || now.After(activity.EndTime) {
-		log.Printf("活动的可用性校验，非可参与时间范围 activityId:%d", cmd.ActivityId)
+		log.Printf("[trade] activity usability check failed, outside the join time window activityId:%d", cmd.ActivityId)
 		return nil, types.NewAppError(types.ResponseE0102)
 	}
 	dc.groupBuyActivity = activity
@@ -66,14 +66,14 @@ func (c *LockRuleChain) activityUsability(ctx context.Context, cmd *TradeLockRul
 
 // userTakeLimit mirrors UserTakeLimitRuleFilter.
 func (c *LockRuleChain) userTakeLimit(ctx context.Context, cmd *TradeLockRuleCommandEntity, dc *lockDynamicContext) (*TradeLockRuleFilterBackEntity, error) {
-	log.Printf("交易规则过滤-用户参与次数校验%s activityId:%d", cmd.UserId, cmd.ActivityId)
+	log.Printf("[trade] lock rule filter - user take-limit check userId:%s activityId:%d", cmd.UserId, cmd.ActivityId)
 	activity := dc.groupBuyActivity
 	count, err := c.repo.QueryOrderCountByActivityId(ctx, cmd.ActivityId, cmd.UserId)
 	if err != nil {
 		return nil, err
 	}
 	if count >= activity.TakeLimitCount {
-		log.Printf("用户参与次数校验，已达可参与上限 activityId:%d", cmd.ActivityId)
+		log.Printf("[trade] user take-limit check failed, participation limit reached activityId:%d", cmd.ActivityId)
 		return nil, types.NewAppError(types.ResponseE0103)
 	}
 	dc.userTakeOrderCount = count
@@ -82,8 +82,8 @@ func (c *LockRuleChain) userTakeLimit(ctx context.Context, cmd *TradeLockRuleCom
 
 // teamStockOccupy mirrors TeamStockOccupyRuleFilter (Redis stock pre-emption).
 func (c *LockRuleChain) teamStockOccupy(ctx context.Context, cmd *TradeLockRuleCommandEntity, dc *lockDynamicContext) (*TradeLockRuleFilterBackEntity, error) {
-	log.Printf("交易规则过滤-组队库存校验%s activityId:%d", cmd.UserId, cmd.ActivityId)
-	// teamId 为空则为首次开团，不做库存限制
+	log.Printf("[trade] lock rule filter - team stock check userId:%s activityId:%d", cmd.UserId, cmd.ActivityId)
+	// An empty teamId means opening a new team, so no stock limit applies.
 	if types.IsBlank(cmd.TeamId) {
 		return &TradeLockRuleFilterBackEntity{UserTakeOrderCount: dc.userTakeOrderCount}, nil
 	}
@@ -95,7 +95,7 @@ func (c *LockRuleChain) teamStockOccupy(ctx context.Context, cmd *TradeLockRuleC
 		return nil, err
 	}
 	if !status {
-		log.Printf("交易规则过滤-组队库存校验%s activityId:%d 抢占失败:%s", cmd.UserId, cmd.ActivityId, teamStockKey)
+		log.Printf("[trade] lock rule filter - team stock check failed userId:%s activityId:%d key:%s", cmd.UserId, cmd.ActivityId, teamStockKey)
 		return nil, types.NewAppError(types.ResponseE0008)
 	}
 	return &TradeLockRuleFilterBackEntity{

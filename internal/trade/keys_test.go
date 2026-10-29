@@ -33,8 +33,9 @@ func TestRandomNumeric(t *testing.T) {
 		t.Errorf("randomNumeric(0) should be empty")
 	}
 	// Two calls should (almost certainly) differ.
-	if randomNumeric(12) == randomNumeric(12) {
-		t.Errorf("randomNumeric produced identical values twice")
+	a, b := randomNumeric(12), randomNumeric(12)
+	if a == b {
+		t.Errorf("randomNumeric produced identical values twice: %s", a)
 	}
 }
 

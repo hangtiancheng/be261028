@@ -111,7 +111,7 @@ func (t *JSONTime) UnmarshalJSON(data []byte) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("无法解析的时间格式: %s", raw)
+	return fmt.Errorf("unparseable time format: %s", raw)
 }
 
 // String returns the naive AppLoc representation (or "" when unset).

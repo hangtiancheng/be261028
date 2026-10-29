@@ -8,24 +8,24 @@ import "fmt"
 type ActivityStatus int
 
 const (
-	ActivityStatusCreate    ActivityStatus = 0 // 创建
-	ActivityStatusEffective ActivityStatus = 1 // 生效
-	ActivityStatusOverdue   ActivityStatus = 2 // 过期
-	ActivityStatusAbandoned ActivityStatus = 3 // 废弃
+	ActivityStatusCreate    ActivityStatus = 0 // created
+	ActivityStatusEffective ActivityStatus = 1 // effective
+	ActivityStatusOverdue   ActivityStatus = 2 // overdue
+	ActivityStatusAbandoned ActivityStatus = 3 // abandoned
 )
 
 func (s ActivityStatus) Info() string {
 	switch s {
 	case ActivityStatusCreate:
-		return "创建"
+		return "Created"
 	case ActivityStatusEffective:
-		return "生效"
+		return "Effective"
 	case ActivityStatusOverdue:
-		return "过期"
+		return "Overdue"
 	case ActivityStatusAbandoned:
-		return "废弃"
+		return "Abandoned"
 	}
-	return "未知"
+	return "Unknown"
 }
 
 // ActivityStatusOf maps a raw db code to an ActivityStatus. Unknown codes fall
@@ -44,30 +44,32 @@ func ActivityStatusOf(code int) ActivityStatus {
 type GroupBuyOrderStatus int
 
 const (
-	GroupBuyOrderProgress GroupBuyOrderStatus = 0 // 拼单中
-	GroupBuyOrderComplete GroupBuyOrderStatus = 1 // 完成
-	GroupBuyOrderFail     GroupBuyOrderStatus = 2 // 失败
+	GroupBuyOrderProgress GroupBuyOrderStatus = 0 // in progress
+	GroupBuyOrderComplete GroupBuyOrderStatus = 1 // complete
+	GroupBuyOrderFail     GroupBuyOrderStatus = 2 // failed
 	// GroupBuyOrderCompleteWithRefund is the db-only state (status = 3) written by
-	// paidTeam2Refund meaning "完成含退单". The legacy GroupBuyOrderEnumVO.valueOf
-	// threw on code 3, which crashed any later read of such a team. We map it to
-	// Complete so the team is still treated as formed for subsequent refunds.
+	// paidTeam2Refund meaning "completed with refund". The legacy
+	// GroupBuyOrderEnumVO.valueOf threw on code 3, which crashed any later read of
+	// such a team. We map it to Complete so the team is still treated as formed for
+	// subsequent refunds.
 	GroupBuyOrderCompleteWithRefund GroupBuyOrderStatus = 3
 )
 
 func (s GroupBuyOrderStatus) Info() string {
 	switch s {
 	case GroupBuyOrderProgress:
-		return "拼单中"
+		return "In progress"
 	case GroupBuyOrderComplete, GroupBuyOrderCompleteWithRefund:
-		return "完成"
+		return "Completed"
 	case GroupBuyOrderFail:
-		return "失败"
+		return "Failed"
 	}
-	return "未知"
+	return "Unknown"
 }
 
 // GroupBuyOrderStatusOf maps a raw db code to a GroupBuyOrderStatus. Code 3
-// (完成含退单) is normalised to Complete; unknown codes fall back to Progress.
+// (completed with refund) is normalised to Complete; unknown codes fall back to
+// Progress.
 func GroupBuyOrderStatusOf(code int) GroupBuyOrderStatus {
 	switch GroupBuyOrderStatus(code) {
 	case GroupBuyOrderProgress:
@@ -86,21 +88,21 @@ func GroupBuyOrderStatusOf(code int) GroupBuyOrderStatus {
 type TradeOrderStatus int
 
 const (
-	TradeOrderCreate   TradeOrderStatus = 0 // 初始创建/锁定
-	TradeOrderComplete TradeOrderStatus = 1 // 消费完成
-	TradeOrderClose    TradeOrderStatus = 2 // 超时关单/退单
+	TradeOrderCreate   TradeOrderStatus = 0 // initial create / locked
+	TradeOrderComplete TradeOrderStatus = 1 // consumption complete
+	TradeOrderClose    TradeOrderStatus = 2 // closed by timeout or refund
 )
 
 func (s TradeOrderStatus) Info() string {
 	switch s {
 	case TradeOrderCreate:
-		return "初始创建"
+		return "Created"
 	case TradeOrderComplete:
-		return "消费完成"
+		return "Completed"
 	case TradeOrderClose:
-		return "超时关单"
+		return "Closed"
 	}
-	return "初始创建"
+	return "Created"
 }
 
 // TradeOrderStatusOf mirrors TradeOrderStatusEnumVO.valueOf: unknown codes fall
@@ -126,9 +128,9 @@ const (
 func (t NotifyType) Info() string {
 	switch t {
 	case NotifyTypeHTTP:
-		return "HTTP 回调"
+		return "HTTP callback"
 	case NotifyTypeMQ:
-		return "MQ 消息通知"
+		return "MQ message notification"
 	}
 	return ""
 }
@@ -163,18 +165,18 @@ const (
 type DiscountType int
 
 const (
-	DiscountTypeBase DiscountType = 0 // 基础优惠
-	DiscountTypeTag  DiscountType = 1 // 人群标签
+	DiscountTypeBase DiscountType = 0 // base discount
+	DiscountTypeTag  DiscountType = 1 // crowd tag
 )
 
 func (d DiscountType) Info() string {
 	switch d {
 	case DiscountTypeBase:
-		return "基础优惠"
+		return "Base discount"
 	case DiscountTypeTag:
-		return "人群标签"
+		return "Crowd tag"
 	}
-	return "未知"
+	return "Unknown"
 }
 
 // DiscountTypeOf maps a raw code, defaulting to Base for unknown values.
@@ -201,13 +203,13 @@ const (
 func (c TaskNotifyCategory) Info() string {
 	switch c {
 	case TaskNotifyTradeSettlement:
-		return "交易结算"
+		return "Trade settlement"
 	case TaskNotifyTradeUnpaid2Refund:
-		return "交易退单-未支付&未成团"
+		return "Trade refund - unpaid, team not formed"
 	case TaskNotifyTradePaid2Refund:
-		return "交易退单-已支付&未成团"
+		return "Trade refund - paid, team not formed"
 	case TaskNotifyTradePaidTeam2Refund:
-		return "交易退单-已支付&已成团"
+		return "Trade refund - paid, team formed"
 	}
 	return ""
 }
@@ -226,11 +228,11 @@ const (
 func (b RefundBehavior) Info() string {
 	switch b {
 	case RefundBehaviorSuccess:
-		return "成功"
+		return "Success"
 	case RefundBehaviorRepeat:
-		return "重复"
+		return "Repeat"
 	case RefundBehaviorFail:
-		return "失败"
+		return "Fail"
 	}
 	return ""
 }
@@ -263,11 +265,11 @@ func (r RefundType) Strategy() string {
 func (r RefundType) Info() string {
 	switch r {
 	case RefundTypeUnpaidUnlock:
-		return "未支付，未成团"
+		return "Unpaid, team not formed"
 	case RefundTypePaidUnformed:
-		return "已支付，未成团"
+		return "Paid, team not formed"
 	case RefundTypePaidFormed:
-		return "已支付，已成团"
+		return "Paid, team formed"
 	}
 	return ""
 }
@@ -280,7 +282,7 @@ func (r RefundType) Matches(team GroupBuyOrderStatus, order TradeOrderStatus) bo
 	case RefundTypePaidUnformed:
 		return team == GroupBuyOrderProgress && order == TradeOrderComplete
 	case RefundTypePaidFormed:
-		// 完成、完成含退单，都做此处理
+		// Both "complete" and "complete with refund" are handled this way.
 		return team == GroupBuyOrderComplete && order == TradeOrderComplete
 	}
 	return false
@@ -298,7 +300,7 @@ func GetRefundStrategy(team GroupBuyOrderStatus, order TradeOrderStatus) (Refund
 			return rt, nil
 		}
 	}
-	return "", fmt.Errorf("不支持的退款状态组合: groupBuyOrderStatus=%d, tradeOrderStatus=%d", team, order)
+	return "", fmt.Errorf("unsupported refund status combination: groupBuyOrderStatus=%d, tradeOrderStatus=%d", team, order)
 }
 
 // GetRefundTypeByCode mirrors RefundTypeEnumVO.getRefundTypeEnumVOByCode.
@@ -307,5 +309,5 @@ func GetRefundTypeByCode(code string) (RefundType, error) {
 	case RefundTypeUnpaidUnlock, RefundTypePaidUnformed, RefundTypePaidFormed:
 		return RefundType(code), nil
 	}
-	return "", fmt.Errorf("退单类型枚举值不存在: %s", code)
+	return "", fmt.Errorf("unknown refund type enum value: %s", code)
 }

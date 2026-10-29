@@ -38,7 +38,7 @@ func (d *DAO) UpdateAddCompleteCount(ctx context.Context, tx *gorm.DB, teamId st
 	return res.RowsAffected, res.Error
 }
 
-// UpdateOrderStatus2COMPLETE mirrors updateOrderStatus2COMPLETE (team -> 完成).
+// UpdateOrderStatus2COMPLETE mirrors updateOrderStatus2COMPLETE (team -> Completed).
 func (d *DAO) UpdateOrderStatus2COMPLETE(ctx context.Context, tx *gorm.DB, teamId string) (int64, error) {
 	res := tx.WithContext(ctx).Model(&GroupBuyOrder{}).
 		Where("team_id = ? AND status = 0", teamId).
@@ -128,7 +128,7 @@ func (d *DAO) UpdateOrderPaid2Refund(ctx context.Context, tx *gorm.DB, teamId st
 }
 
 // UpdateOrderPaidTeam2Refund mirrors group_buy_order paidTeam2Refund: status -> 3
-// (完成含退单) when more than one member remains.
+// (Completed with refunds) when more than one member remains.
 func (d *DAO) UpdateOrderPaidTeam2Refund(ctx context.Context, tx *gorm.DB, teamId string, lockCountDelta, completeCountDelta int) (int64, error) {
 	res := tx.WithContext(ctx).Model(&GroupBuyOrder{}).
 		Where("team_id = ? AND (status = 1 OR status = 3) AND complete_count > 1", teamId).
@@ -142,7 +142,7 @@ func (d *DAO) UpdateOrderPaidTeam2Refund(ctx context.Context, tx *gorm.DB, teamI
 }
 
 // UpdateOrderPaidTeam2RefundFail mirrors group_buy_order paidTeam2RefundFail:
-// status -> 2 (失败) when the last member refunds.
+// status -> 2 (Failed) when the last member refunds.
 func (d *DAO) UpdateOrderPaidTeam2RefundFail(ctx context.Context, tx *gorm.DB, teamId string, lockCountDelta, completeCountDelta int) (int64, error) {
 	res := tx.WithContext(ctx).Model(&GroupBuyOrder{}).
 		Where("team_id = ? AND (status = 1 OR status = 3) AND complete_count = 1", teamId).

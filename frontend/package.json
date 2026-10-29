@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "be261028 拼团营销系统前端 — Vite + Lit + @yukino.js/lit-jsx + TailwindCSS v4 + motion",
+  "description": "be261028 group-buy marketing system frontend — Vite + Lit + @yukino.js/lit-jsx + TailwindCSS v4 + motion",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -17,6 +17,8 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "vite": "^7.3.7"

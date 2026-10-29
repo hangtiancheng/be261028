@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hangtiancheng/be261028/internal/api"
@@ -37,7 +38,7 @@ func (s *ActivityManageService) UpdateActivity(ctx context.Context, entity *Acti
 		return nil, err
 	}
 	if existing == nil {
-		return nil, fmt.Errorf("活动不存在: %d", entity.ActivityId)
+		return nil, fmt.Errorf("activity not found: %d", entity.ActivityId)
 	}
 	if err := validateActivity(entity); err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func (s *ActivityManageService) DeleteActivity(ctx context.Context, activityId i
 		return false, err
 	}
 	if existing == nil {
-		return false, fmt.Errorf("活动不存在: %d", activityId)
+		return false, fmt.Errorf("activity not found: %d", activityId)
 	}
 	return s.repo.DeleteActivity(ctx, activityId)
 }
@@ -65,7 +66,7 @@ func (s *ActivityManageService) GetActivityDetail(ctx context.Context, activityI
 		return nil, err
 	}
 	if entity == nil {
-		return nil, fmt.Errorf("活动不存在: %d", activityId)
+		return nil, fmt.Errorf("activity not found: %d", activityId)
 	}
 	return entity, nil
 }
@@ -75,28 +76,28 @@ func (s *ActivityManageService) GetActivityList(ctx context.Context) ([]*Activit
 	return s.repo.GetActivityList(ctx)
 }
 
-// EnableActivity sets status to 生效 (1).
+// EnableActivity sets the activity status to Effective (1).
 func (s *ActivityManageService) EnableActivity(ctx context.Context, activityId int64) (*ActivityManageEntity, error) {
 	entity, err := s.repo.GetActivityById(ctx, activityId)
 	if err != nil {
 		return nil, err
 	}
 	if entity == nil {
-		return nil, fmt.Errorf("活动不存在: %d", activityId)
+		return nil, fmt.Errorf("activity not found: %d", activityId)
 	}
 	entity.Status = int(types.ActivityStatusEffective)
 	entity.UpdateTime = types.Now()
 	return s.repo.UpdateActivity(ctx, entity)
 }
 
-// DisableActivity sets status to 废弃 (3).
+// DisableActivity sets the activity status to Abandoned (3).
 func (s *ActivityManageService) DisableActivity(ctx context.Context, activityId int64) (*ActivityManageEntity, error) {
 	entity, err := s.repo.GetActivityById(ctx, activityId)
 	if err != nil {
 		return nil, err
 	}
 	if entity == nil {
-		return nil, fmt.Errorf("活动不存在: %d", activityId)
+		return nil, fmt.Errorf("activity not found: %d", activityId)
 	}
 	entity.Status = int(types.ActivityStatusAbandoned)
 	entity.UpdateTime = types.Now()
@@ -106,22 +107,22 @@ func (s *ActivityManageService) DisableActivity(ctx context.Context, activityId 
 // validateActivity mirrors ActivityManageServiceImpl.validateActivity.
 func validateActivity(e *ActivityManageEntity) error {
 	if e.ActivityId == 0 {
-		return fmt.Errorf("活动ID不能为空")
+		return errors.New("activity id must not be empty")
 	}
 	if types.IsBlank(e.ActivityName) {
-		return fmt.Errorf("活动名称不能为空")
+		return errors.New("activity name must not be empty")
 	}
 	if types.IsBlank(e.DiscountId) {
-		return fmt.Errorf("折扣ID不能为空")
+		return errors.New("discount id must not be empty")
 	}
 	if e.StartTime.IsZero() {
-		return fmt.Errorf("活动开始时间不能为空")
+		return errors.New("activity start time must not be empty")
 	}
 	if e.EndTime.IsZero() {
-		return fmt.Errorf("活动结束时间不能为空")
+		return errors.New("activity end time must not be empty")
 	}
 	if e.StartTime.After(e.EndTime) {
-		return fmt.Errorf("活动开始时间不能晚于结束时间")
+		return errors.New("activity start time must not be later than end time")
 	}
 	if e.DiscountInfo != nil {
 		if err := validateDiscountInfo(e.DiscountInfo); err != nil {
@@ -138,32 +139,38 @@ func validateActivity(e *ActivityManageEntity) error {
 
 func validateDiscountInfo(d *DiscountInfo) error {
 	if types.IsBlank(d.DiscountName) {
-		return fmt.Errorf("折扣名称不能为空")
+		return errors.New("discount name must not be empty")
 	}
 	if types.IsBlank(d.MarketPlan) {
-		return fmt.Errorf("营销优惠计划不能为空")
+		return errors.New("market plan must not be empty")
 	}
 	if types.IsBlank(d.MarketExpr) {
-		return fmt.Errorf("营销优惠表达式不能为空")
+		return errors.New("market expression must not be empty")
 	}
 	return nil
 }
 
 func validateSkuInfo(k *SkuInfo) error {
 	if types.IsBlank(k.GoodsId) {
-		return fmt.Errorf("商品ID不能为空")
+		return errors.New("goods id must not be empty")
 	}
 	if types.IsBlank(k.GoodsName) {
-		return fmt.Errorf("商品名称不能为空")
+		return errors.New("goods name must not be empty")
 	}
+	// Defect fix: the legacy validation paired each field with the other field's
+	// label (a blank source reported "channel must not be empty" and a blank
+	// channel reported "source must not be empty"), a copy-paste confusion carried
+	// over from the legacy DTO comments, which labelled the source field "channel"
+	// and the channel field "source". Messages now match the field actually being
+	// validated; the rejection behavior is unchanged.
 	if types.IsBlank(k.Source) {
-		return fmt.Errorf("渠道不能为空")
+		return errors.New("source must not be empty")
 	}
 	if types.IsBlank(k.Channel) {
-		return fmt.Errorf("来源不能为空")
+		return errors.New("channel must not be empty")
 	}
 	if k.OriginalPrice.IsZero() || k.OriginalPrice.IsNegative() {
-		return fmt.Errorf("商品价格必须大于0")
+		return errors.New("goods price must be greater than zero")
 	}
 	return nil
 }

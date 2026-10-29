@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hangtiancheng/be261028/internal/dao"
 	"github.com/hangtiancheng/be261028/internal/infra/redisx"
@@ -36,11 +37,11 @@ func (r *ActivityManageRepository) invalidateCache(ctx context.Context, activity
 		return
 	}
 	if err := r.redis.Remove(ctx, (&dao.GroupBuyActivity{}).CacheRedisKey(activityId)); err != nil {
-		fmt.Printf("[activity] 失效活动缓存失败 activityId:%d err:%v\n", activityId, err)
+		log.Printf("[activity] failed to invalidate activity cache activityId:%d err:%v", activityId, err)
 	}
 	if discountId != "" {
 		if err := r.redis.Remove(ctx, (&dao.GroupBuyDiscount{}).CacheRedisKey(discountId)); err != nil {
-			fmt.Printf("[activity] 失效折扣缓存失败 discountId:%s err:%v\n", discountId, err)
+			log.Printf("[activity] failed to invalidate discount cache discountId:%s err:%v", discountId, err)
 		}
 	}
 }
@@ -59,14 +60,14 @@ func (r *ActivityManageRepository) SaveActivity(ctx context.Context, entity *Act
 
 	activityPO := entityToActivityPO(entity)
 	if err := r.dao.InsertGroupBuyActivity(ctx, tx, activityPO); err != nil {
-		return nil, fmt.Errorf("保存活动信息失败: %w", err)
+		return nil, fmt.Errorf("failed to save activity: %w", err)
 	}
 	if entity.DiscountInfo != nil {
 		discountPO := discountInfoToPO(entity.DiscountInfo)
 		discountPO.CreateTime = now
 		discountPO.UpdateTime = now
 		if err := r.dao.InsertGroupBuyDiscount(ctx, tx, discountPO); err != nil {
-			return nil, fmt.Errorf("保存折扣信息失败: %w", err)
+			return nil, fmt.Errorf("failed to save discount: %w", err)
 		}
 	}
 	if entity.SkuInfo != nil {
@@ -74,7 +75,7 @@ func (r *ActivityManageRepository) SaveActivity(ctx context.Context, entity *Act
 		skuPO.CreateTime = now
 		skuPO.UpdateTime = now
 		if err := r.dao.InsertSku(ctx, tx, skuPO); err != nil {
-			return nil, fmt.Errorf("保存SKU信息失败: %w", err)
+			return nil, fmt.Errorf("failed to save sku: %w", err)
 		}
 		scPO := &dao.SCSkuActivity{
 			ActivityId: entity.ActivityId,
@@ -85,7 +86,7 @@ func (r *ActivityManageRepository) SaveActivity(ctx context.Context, entity *Act
 			UpdateTime: now,
 		}
 		if err := r.dao.InsertSCSkuActivity(ctx, tx, scPO); err != nil {
-			return nil, fmt.Errorf("保存SKU活动关联关系失败: %w", err)
+			return nil, fmt.Errorf("failed to save sku-activity mapping: %w", err)
 		}
 	}
 	if err := tx.Commit().Error; err != nil {
@@ -100,7 +101,7 @@ func (r *ActivityManageRepository) SaveActivity(ctx context.Context, entity *Act
 func (r *ActivityManageRepository) UpdateActivity(ctx context.Context, entity *ActivityManageEntity) (*ActivityManageEntity, error) {
 	existing, err := r.dao.QueryGroupBuyActivityByActivityId(ctx, r.db, entity.ActivityId)
 	if errors.Is(err, dao.ErrNotFound) {
-		return nil, fmt.Errorf("活动不存在: %d", entity.ActivityId)
+		return nil, fmt.Errorf("activity not found: %d", entity.ActivityId)
 	}
 	if err != nil {
 		return nil, err
@@ -118,20 +119,20 @@ func (r *ActivityManageRepository) UpdateActivity(ctx context.Context, entity *A
 	activityPO.TagId = existing.TagId
 	activityPO.TagScope = existing.TagScope
 	if err := r.dao.UpdateGroupBuyActivity(ctx, tx, activityPO); err != nil {
-		return nil, fmt.Errorf("更新活动信息失败: %w", err)
+		return nil, fmt.Errorf("failed to update activity: %w", err)
 	}
 	if entity.DiscountInfo != nil {
 		discountPO := discountInfoToPO(entity.DiscountInfo)
 		discountPO.UpdateTime = entity.UpdateTime
 		if err := r.dao.UpdateGroupBuyDiscount(ctx, tx, discountPO); err != nil {
-			return nil, fmt.Errorf("更新折扣信息失败: %w", err)
+			return nil, fmt.Errorf("failed to update discount: %w", err)
 		}
 	}
 	if entity.SkuInfo != nil {
 		skuPO := skuInfoToPO(entity.SkuInfo)
 		skuPO.UpdateTime = entity.UpdateTime
 		if err := r.dao.UpdateSku(ctx, tx, skuPO); err != nil {
-			return nil, fmt.Errorf("更新SKU信息失败: %w", err)
+			return nil, fmt.Errorf("failed to update sku: %w", err)
 		}
 		scPO := &dao.SCSkuActivity{
 			ActivityId: entity.ActivityId,
@@ -141,7 +142,7 @@ func (r *ActivityManageRepository) UpdateActivity(ctx context.Context, entity *A
 			UpdateTime: entity.UpdateTime,
 		}
 		if err := r.dao.UpdateSCSkuActivity(ctx, tx, scPO); err != nil {
-			return nil, fmt.Errorf("更新SKU活动关联关系失败: %w", err)
+			return nil, fmt.Errorf("failed to update sku-activity mapping: %w", err)
 		}
 	}
 	if err := tx.Commit().Error; err != nil {
@@ -155,7 +156,7 @@ func (r *ActivityManageRepository) UpdateActivity(ctx context.Context, entity *A
 // rows are intentionally kept (they may be shared), matching the legacy behaviour.
 func (r *ActivityManageRepository) DeleteActivity(ctx context.Context, activityId int64) (bool, error) {
 	if _, err := r.dao.QueryGroupBuyActivityByActivityId(ctx, r.db, activityId); errors.Is(err, dao.ErrNotFound) {
-		return false, fmt.Errorf("活动不存在: %d", activityId)
+		return false, fmt.Errorf("activity not found: %d", activityId)
 	} else if err != nil {
 		return false, err
 	}
@@ -167,14 +168,14 @@ func (r *ActivityManageRepository) DeleteActivity(ctx context.Context, activityI
 	defer tx.Rollback() //nolint:errcheck
 
 	if _, err := r.dao.DeleteSCSkuActivityByActivityId(ctx, tx, activityId); err != nil {
-		return false, fmt.Errorf("删除SKU活动关联关系失败: %w", err)
+		return false, fmt.Errorf("failed to delete sku-activity mapping: %w", err)
 	}
 	deleted, err := r.dao.DeleteGroupBuyActivity(ctx, tx, activityId)
 	if err != nil {
-		return false, fmt.Errorf("删除活动信息失败: %w", err)
+		return false, fmt.Errorf("failed to delete activity: %w", err)
 	}
 	if deleted <= 0 {
-		return false, fmt.Errorf("删除活动信息失败")
+		return false, errors.New("failed to delete activity: no rows affected")
 	}
 	if err := tx.Commit().Error; err != nil {
 		return false, err

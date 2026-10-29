@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* 品牌主题令牌（Tailwind v4 CSS-first 配置，非手写样式规则） */
+/* Brand theme tokens (Tailwind v4 CSS-first configuration — not hand-written rules). */
 @theme {
   --color-brand-50: oklch(0.969 0.015 12.422);
   --color-brand-100: oklch(0.941 0.03 12.422);
@@ -13,6 +13,6 @@
   --color-brand-800: oklch(0.413 0.164 12.422);
   --color-brand-900: oklch(0.358 0.135 12.422);
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 }

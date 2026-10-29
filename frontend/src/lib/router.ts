@@ -1,9 +1,10 @@
 /**
- * 轻量 hash 路由。
- * 说明：npm 上的 @yukino.js/lit-jsx@0.0.1 未导出 community 入口（router/icon），
- * 因此按技能文档中 community router 的 hash 模式语义实现一个最小路由：
- * hash 变化 → 订阅者收到规范化路径；navigate() 修改 location.hash。
- * 选用 hash 模式还因为生产环境由 Go 网关静态服务 dist，无 SPA fallback。
+ * Minimal hash router.
+ * Note: @yukino.js/lit-jsx@0.0.1 on npm does not export the community entry
+ * (router/icon), so this implements the community router's hash-mode semantics
+ * directly: a hash change emits the normalized path to subscribers, and
+ * navigate() rewrites location.hash. Hash mode is also required because the Go
+ * gateway serves dist/ statically in production with no SPA fallback.
  */
 
 export type RouteChangeListener = (path: string) => void;
@@ -42,7 +43,7 @@ function emit(): void {
 
 let started = false;
 
-/** 启动 hashchange 监听（幂等）。 */
+/** Starts the hashchange listener (idempotent). */
 export function startRouter(): void {
   if (started) return;
   started = true;

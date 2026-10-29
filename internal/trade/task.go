@@ -27,7 +27,7 @@ func NewTradeTaskService(repo *TradeRepository, port *TradePort, maxRetry int) *
 
 // ExecNotifyJob runs all unexecuted notify tasks (the scheduled job entry point).
 func (s *TradeTaskService) ExecNotifyJob(ctx context.Context) (map[string]int, error) {
-	log.Printf("拼团交易-执行回调通知任务")
+	log.Printf("[trade] notify job - executing callback notify tasks")
 	tasks, err := s.repo.QueryUnExecutedNotifyTaskList(ctx)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (s *TradeTaskService) ExecNotifyJob(ctx context.Context) (map[string]int, e
 
 // ExecNotifyJobByTeamId runs the unexecuted notify task for a specific team.
 func (s *TradeTaskService) ExecNotifyJobByTeamId(ctx context.Context, teamId string) (map[string]int, error) {
-	log.Printf("拼团交易-执行回调通知回调，指定 teamId:%s", teamId)
+	log.Printf("[trade] notify job - executing callback notify for teamId:%s", teamId)
 	tasks, err := s.repo.QueryUnExecutedNotifyTaskListByTeamId(ctx, teamId)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (s *TradeTaskService) ExecNotifyJobByTeamId(ctx context.Context, teamId str
 // ExecNotifyJobTask runs a single notify task (used by the async settlement/refund
 // callback path).
 func (s *TradeTaskService) ExecNotifyJobTask(ctx context.Context, task *NotifyTaskEntity) (map[string]int, error) {
-	log.Printf("拼团交易-执行回调通知回调，指定 teamId:%s notifyTaskId:%d", task.TeamId, task.Id)
+	log.Printf("[trade] notify job - executing callback notify for teamId:%s notifyTaskId:%d", task.TeamId, task.Id)
 	return s.execNotifyJobList(ctx, []*NotifyTaskEntity{task})
 }
 
@@ -57,7 +57,7 @@ func (s *TradeTaskService) execNotifyJobList(ctx context.Context, tasks []*Notif
 	for _, task := range tasks {
 		response, err := s.port.GroupBuyNotify(ctx, task)
 		if err != nil {
-			log.Printf("回调通知执行异常 teamId:%s err:%v", task.TeamId, err)
+			log.Printf("[trade] notify job - callback notify error teamId:%s err:%v", task.TeamId, err)
 			metrics.NotifyTasksTotal.WithLabelValues("error").Inc()
 			continue
 		}
@@ -65,7 +65,7 @@ func (s *TradeTaskService) execNotifyJobList(ctx context.Context, tasks []*Notif
 		case types.NotifyTaskSuccess:
 			n, err := s.repo.UpdateNotifyTaskStatusSuccess(ctx, task.Id)
 			if err != nil {
-				log.Printf("更新回调任务成功状态失败 id:%d err:%v", task.Id, err)
+				log.Printf("[trade] notify job - failed to mark task success id:%d err:%v", task.Id, err)
 			} else if n == 1 {
 				successCount++
 				metrics.NotifyTasksTotal.WithLabelValues("success").Inc()
@@ -74,7 +74,7 @@ func (s *TradeTaskService) execNotifyJobList(ctx context.Context, tasks []*Notif
 			if task.NotifyCount > s.maxRetry {
 				n, err := s.repo.UpdateNotifyTaskStatusError(ctx, task.Id)
 				if err != nil {
-					log.Printf("更新回调任务失败状态失败 id:%d err:%v", task.Id, err)
+					log.Printf("[trade] notify job - failed to mark task error id:%d err:%v", task.Id, err)
 				} else if n == 1 {
 					errorCount++
 					metrics.NotifyTasksTotal.WithLabelValues("error").Inc()
@@ -82,7 +82,7 @@ func (s *TradeTaskService) execNotifyJobList(ctx context.Context, tasks []*Notif
 			} else {
 				n, err := s.repo.UpdateNotifyTaskStatusRetry(ctx, task.Id)
 				if err != nil {
-					log.Printf("更新回调任务重试状态失败 id:%d err:%v", task.Id, err)
+					log.Printf("[trade] notify job - failed to mark task retry id:%d err:%v", task.Id, err)
 				} else if n == 1 {
 					retryCount++
 					metrics.NotifyTasksTotal.WithLabelValues("retry").Inc()

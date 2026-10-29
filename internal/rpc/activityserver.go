@@ -29,88 +29,88 @@ func NewActivityServer(manage *activity.ActivityManageService, index *activity.I
 
 // CreateActivity mirrors AdminController.createActivity.
 func (s *ActivityServer) CreateActivity(ctx context.Context, req *api.ActivityManageRequestDTO) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "CreateActivity", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "CreateActivity", reply.RPCResultRef(), err) }()
 	entity := requestDTOToEntity(req)
 	saved, err := s.manage.CreateActivity(ctx, entity)
 	if err != nil {
-		log.Printf("创建活动失败: %v", err)
-		return activityErrorReply("创建活动失败", err), nil
+		log.Printf("[activity] create activity failed: %v", err)
+		return activityErrorReply("create activity failed", err), nil
 	}
 	dto := entityToResponseDTO(saved)
 	dto.Success = true
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "创建活动成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity created"},
 		Data:      dto,
 	}, nil
 }
 
 // UpdateActivity mirrors AdminController.updateActivity.
 func (s *ActivityServer) UpdateActivity(ctx context.Context, req *api.ActivityManageRequestDTO) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "UpdateActivity", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "UpdateActivity", reply.RPCResultRef(), err) }()
 	entity := requestDTOToEntity(req)
 	saved, err := s.manage.UpdateActivity(ctx, entity)
 	if err != nil {
-		log.Printf("更新活动失败: %v", err)
-		return activityErrorReply("更新活动失败", err), nil
+		log.Printf("[activity] update activity failed: %v", err)
+		return activityErrorReply("update activity failed", err), nil
 	}
 	dto := entityToResponseDTO(saved)
 	dto.Success = true
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "更新活动成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity updated"},
 		Data:      dto,
 	}, nil
 }
 
 // DeleteActivity mirrors AdminController.deleteActivity.
 func (s *ActivityServer) DeleteActivity(ctx context.Context, req *api.ActivityIdRequest) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "DeleteActivity", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "DeleteActivity", reply.RPCResultRef(), err) }()
 	result, err := s.manage.DeleteActivity(ctx, req.ActivityId)
 	if err != nil {
-		log.Printf("删除活动失败: activityId=%d err=%v", req.ActivityId, err)
-		reply := activityErrorReply("删除活动失败", err)
+		log.Printf("[activity] delete activity failed: activityId=%d err=%v", req.ActivityId, err)
+		reply := activityErrorReply("delete activity failed", err)
 		reply.Data.ActivityId = req.ActivityId
 		return reply, nil
 	}
 	dto := &api.ActivityManageResponseDTO{ActivityId: req.ActivityId, Success: result}
 	if result {
 		return &api.ActivityManageReply{
-			RPCResult: api.RPCResult{Code: "SUCCESS", Info: "删除活动成功"},
+			RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity deleted"},
 			Data:      dto,
 		}, nil
 	}
-	dto.ErrorMessage = "删除活动失败"
+	dto.ErrorMessage = "delete activity failed"
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "ERROR", Info: "删除活动失败"},
+		RPCResult: api.RPCResult{Code: "ERROR", Info: "delete activity failed"},
 		Data:      dto,
 	}, nil
 }
 
 // GetActivityDetail mirrors AdminController.getActivityDetail.
 func (s *ActivityServer) GetActivityDetail(ctx context.Context, req *api.ActivityIdRequest) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "GetActivityDetail", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "GetActivityDetail", reply.RPCResultRef(), err) }()
 	entity, err := s.manage.GetActivityDetail(ctx, req.ActivityId)
 	if err != nil {
-		log.Printf("查询活动详情失败: activityId=%d err=%v", req.ActivityId, err)
-		reply := activityErrorReply("查询活动详情失败", err)
+		log.Printf("[activity] get activity detail failed: activityId=%d err=%v", req.ActivityId, err)
+		reply := activityErrorReply("get activity detail failed", err)
 		reply.Data.ActivityId = req.ActivityId
 		return reply, nil
 	}
 	dto := entityToResponseDTO(entity)
 	dto.Success = true
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "查询活动详情成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity detail retrieved"},
 		Data:      dto,
 	}, nil
 }
 
 // GetActivityList mirrors AdminController.getActivityList.
 func (s *ActivityServer) GetActivityList(ctx context.Context, req *api.EmptyRequest) (reply *api.ActivityListReply, err error) {
-	defer func() { recordRPC("ActivityService", "GetActivityList", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "GetActivityList", reply.RPCResultRef(), err) }()
 	entities, err := s.manage.GetActivityList(ctx)
 	if err != nil {
-		log.Printf("查询活动列表失败: %v", err)
+		log.Printf("[activity] get activity list failed: %v", err)
 		return &api.ActivityListReply{
-			RPCResult: api.RPCResult{Code: "ERROR", Info: "查询活动列表失败: " + err.Error()},
+			RPCResult: api.RPCResult{Code: "ERROR", Info: "get activity list failed: " + err.Error()},
 		}, nil
 	}
 	list := make([]*api.ActivityManageResponseDTO, 0, len(entities))
@@ -120,43 +120,43 @@ func (s *ActivityServer) GetActivityList(ctx context.Context, req *api.EmptyRequ
 		list = append(list, dto)
 	}
 	return &api.ActivityListReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "查询活动列表成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity list retrieved"},
 		Data:      list,
 	}, nil
 }
 
 // EnableActivity mirrors AdminController.enableActivity.
 func (s *ActivityServer) EnableActivity(ctx context.Context, req *api.ActivityIdRequest) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "EnableActivity", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "EnableActivity", reply.RPCResultRef(), err) }()
 	entity, err := s.manage.EnableActivity(ctx, req.ActivityId)
 	if err != nil {
-		log.Printf("启用活动失败: activityId=%d err=%v", req.ActivityId, err)
-		reply := activityErrorReply("启用活动失败", err)
+		log.Printf("[activity] enable activity failed: activityId=%d err=%v", req.ActivityId, err)
+		reply := activityErrorReply("enable activity failed", err)
 		reply.Data.ActivityId = req.ActivityId
 		return reply, nil
 	}
 	dto := entityToResponseDTO(entity)
 	dto.Success = true
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "启用活动成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity enabled"},
 		Data:      dto,
 	}, nil
 }
 
 // DisableActivity mirrors AdminController.disableActivity.
 func (s *ActivityServer) DisableActivity(ctx context.Context, req *api.ActivityIdRequest) (reply *api.ActivityManageReply, err error) {
-	defer func() { recordRPC("ActivityService", "DisableActivity", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "DisableActivity", reply.RPCResultRef(), err) }()
 	entity, err := s.manage.DisableActivity(ctx, req.ActivityId)
 	if err != nil {
-		log.Printf("禁用活动失败: activityId=%d err=%v", req.ActivityId, err)
-		reply := activityErrorReply("禁用活动失败", err)
+		log.Printf("[activity] disable activity failed: activityId=%d err=%v", req.ActivityId, err)
+		reply := activityErrorReply("disable activity failed", err)
 		reply.Data.ActivityId = req.ActivityId
 		return reply, nil
 	}
 	dto := entityToResponseDTO(entity)
 	dto.Success = true
 	return &api.ActivityManageReply{
-		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "禁用活动成功"},
+		RPCResult: api.RPCResult{Code: "SUCCESS", Info: "activity disabled"},
 		Data:      dto,
 	}, nil
 }
@@ -167,8 +167,8 @@ func (s *ActivityServer) DisableActivity(ctx context.Context, req *api.ActivityI
 // trial calculation, in-progress team list and team statistics assembled into one
 // response.
 func (s *ActivityServer) QueryGroupBuyMarketConfig(ctx context.Context, req *api.GoodsMarketRequestDTO) (reply *api.MarketConfigReply, err error) {
-	defer func() { recordRPC("ActivityService", "QueryGroupBuyMarketConfig", &reply.RPCResult, err) }()
-	log.Printf("查询拼团营销配置开始:%s goodsId:%s", req.UserId, req.GoodsId)
+	defer func() { recordRPC("ActivityService", "QueryGroupBuyMarketConfig", reply.RPCResultRef(), err) }()
+	log.Printf("[activity] query group-buy market config start userId:%s goodsId:%s", req.UserId, req.GoodsId)
 	if types.IsBlank(req.UserId) || types.IsBlank(req.Source) || types.IsBlank(req.Channel) || types.IsBlank(req.GoodsId) {
 		return &api.MarketConfigReply{RPCResult: resultFromCode(types.ResponseIllegalParam)}, nil
 	}
@@ -228,13 +228,13 @@ func (s *ActivityServer) QueryGroupBuyMarketConfig(ctx context.Context, req *api
 			AllTeamUserCount:     statistic.AllTeamUserCount,
 		},
 	}
-	log.Printf("查询拼团营销配置完成:%s goodsId:%s", req.UserId, req.GoodsId)
+	log.Printf("[activity] query group-buy market config done userId:%s goodsId:%s", req.UserId, req.GoodsId)
 	return &api.MarketConfigReply{RPCResult: resultFromCode(types.ResponseSuccess), Data: resp}, nil
 }
 
 // IndexMarketTrial exposes the trial tree to the trade service (used during lock).
 func (s *ActivityServer) IndexMarketTrial(ctx context.Context, req *api.MarketProductEntity) (reply *api.MarketTrialReply, err error) {
-	defer func() { recordRPC("ActivityService", "IndexMarketTrial", &reply.RPCResult, err) }()
+	defer func() { recordRPC("ActivityService", "IndexMarketTrial", reply.RPCResultRef(), err) }()
 	trial, err := s.index.IndexMarketTrial(ctx, req)
 	if err != nil {
 		return &api.MarketTrialReply{RPCResult: resultFromError(err)}, nil

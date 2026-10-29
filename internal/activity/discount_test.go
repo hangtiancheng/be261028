@@ -109,8 +109,10 @@ func TestZKPercentage(t *testing.T) {
 }
 
 func TestGroupBuyActivityDiscountVisibility(t *testing.T) {
-	// tag_scope 语义：包含 "1" -> 可见限制；包含 "2" -> 参与限制。
-	// 缺陷修复后按"包含"判断（旧版只看固定下标，"2" 单独出现或 "2,1" 顺序颠倒都会误判）。
+	// tag_scope semantics: containing "1" -> visibility restriction; containing
+	// "2" -> participation restriction. After the defect fix membership is checked
+	// with "contains" (the legacy code only looked at fixed positions, so a lone
+	// "2" or a reversed "2,1" were both misclassified).
 	cases := []struct {
 		tagScope string
 		visible  bool

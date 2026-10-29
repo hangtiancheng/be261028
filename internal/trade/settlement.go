@@ -44,9 +44,9 @@ func (c *SettlementRuleChain) Apply(ctx context.Context, cmd *TradeSettlementRul
 
 // scRule mirrors SCRuleFilter (channel blacklist).
 func (c *SettlementRuleChain) scRule(ctx context.Context, cmd *TradeSettlementRuleCommandEntity, dc *settlementDynamicContext) (*TradeSettlementRuleFilterBackEntity, error) {
-	log.Printf("结算规则过滤-渠道黑名单校验%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] settlement rule filter - SC channel blacklist check userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	if c.repo.IsSCBlackIntercept(cmd.Source, cmd.Channel) {
-		log.Printf("%s%s 渠道黑名单拦截", cmd.Source, cmd.Channel)
+		log.Printf("[trade] intercepted by SC channel blacklist source:%s channel:%s", cmd.Source, cmd.Channel)
 		return nil, types.NewAppError(types.ResponseE0105)
 	}
 	return nil, nil
@@ -59,17 +59,17 @@ func (c *SettlementRuleChain) scRule(ctx context.Context, cmd *TradeSettlementRu
 // and the unguarded status update double-incremented the team's complete_count,
 // completing teams with fewer real payments than the target.
 func (c *SettlementRuleChain) outTradeNoRule(ctx context.Context, cmd *TradeSettlementRuleCommandEntity, dc *settlementDynamicContext) (*TradeSettlementRuleFilterBackEntity, error) {
-	log.Printf("结算规则过滤-外部单号校验%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] settlement rule filter - outTradeNo check userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	order, err := c.repo.QueryMarketPayOrderEntityByOutTradeNo(ctx, cmd.UserId, cmd.OutTradeNo)
 	if err != nil {
 		return nil, err
 	}
 	if order == nil || order.TradeOrderStatus == types.TradeOrderClose {
-		log.Printf("不存在的外部交易单号或用户已退单，不需要做支付订单结算:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+		log.Printf("[trade] unknown outTradeNo or already refunded, settlement skipped userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 		return nil, types.NewAppError(types.ResponseE0104)
 	}
 	if order.TradeOrderStatus == types.TradeOrderComplete {
-		log.Printf("外部交易单号已结算，幂等返回:%s outTradeNo:%s teamId:%s", cmd.UserId, cmd.OutTradeNo, order.TeamId)
+		log.Printf("[trade] outTradeNo already settled, returning idempotently userId:%s outTradeNo:%s teamId:%s", cmd.UserId, cmd.OutTradeNo, order.TeamId)
 		return &TradeSettlementRuleFilterBackEntity{
 			TeamId:         order.TeamId,
 			ActivityId:     order.ActivityId,
@@ -82,14 +82,15 @@ func (c *SettlementRuleChain) outTradeNoRule(ctx context.Context, cmd *TradeSett
 
 // settableRule mirrors SettableRuleFilter (payment time within the team window).
 func (c *SettlementRuleChain) settableRule(ctx context.Context, cmd *TradeSettlementRuleCommandEntity, dc *settlementDynamicContext) (*TradeSettlementRuleFilterBackEntity, error) {
-	log.Printf("结算规则过滤-有效时间校验%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] settlement rule filter - valid-time check userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	team, err := c.repo.QueryGroupBuyTeamByTeamId(ctx, dc.marketPayOrderEntity.TeamId)
 	if err != nil {
 		return nil, err
 	}
-	// 外部交易时间（用户支付完成时间）必须在拼团有效时间范围内
+	// The external trade time (when the user finished paying) must fall within the
+	// group-buy validity window.
 	if !cmd.OutTradeTime.Before(team.ValidEndTime) {
-		log.Printf("订单交易时间不在拼团有效时间范围内")
+		log.Printf("[trade] order trade time is outside the group-buy validity window")
 		return nil, types.NewAppError(types.ResponseE0106)
 	}
 	dc.groupBuyTeamEntity = team
@@ -98,7 +99,7 @@ func (c *SettlementRuleChain) settableRule(ctx context.Context, cmd *TradeSettle
 
 // endRule mirrors EndRuleFilter (assemble the back entity).
 func (c *SettlementRuleChain) endRule(ctx context.Context, cmd *TradeSettlementRuleCommandEntity, dc *settlementDynamicContext) (*TradeSettlementRuleFilterBackEntity, error) {
-	log.Printf("结算规则过滤-结束节点%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
+	log.Printf("[trade] settlement rule filter - end node userId:%s outTradeNo:%s", cmd.UserId, cmd.OutTradeNo)
 	team := dc.groupBuyTeamEntity
 	return &TradeSettlementRuleFilterBackEntity{
 		TeamId:         team.TeamId,

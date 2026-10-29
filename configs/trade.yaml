@@ -1,11 +1,11 @@
-# be261028 trade 服务配置
+# be261028 trade service configuration
 service:
   name: trade
-  rpcAddr: "127.0.0.1:19002"      # yukino_rpc 监听地址
-  metricsAddr: "127.0.0.1:19102"  # Prometheus /metrics 与 /health
+  rpcAddr: "127.0.0.1:19002"      # yukino_rpc listen address
+  metricsAddr: "127.0.0.1:19102"  # Prometheus /metrics and /health
 
 rpc:
-  activityTarget: "127.0.0.1:19001"  # 锁单试算回调 activity 服务
+  activityTarget: "127.0.0.1:19001"  # activity service called back for lock-order trial pricing
   timeout: 5s
 
 mysql:
@@ -41,12 +41,12 @@ dcc:
     cacheSwitch: "0"
 
 notify:
-  jobInterval: 20m            # 定时回调通知任务间隔（替代旧 cron 0 1/20 * * * *）
+  jobInterval: 20m            # interval for the scheduled callback-notify job (replaces legacy cron 0 1/20 * * * *)
   jobLockKey: "be261028_notify_job_exec"
   httpLockWait: 3s
   httpLockLease: 30s
   callbackTimeout: 10s
-  maxRetry: 4                 # notify_count > 4 后标记失败
+  maxRetry: 4                 # mark failed once notify_count > 4
 
 log:
   level: "info"

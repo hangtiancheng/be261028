@@ -4,10 +4,19 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/hangtiancheng/be261028/internal/api"
 	"github.com/hangtiancheng/be261028/internal/types"
 )
+
+// marketFanoutTimeout bounds the concurrent activity/SKU load in the Market node.
+//
+// Defect fix (legacy defect 9): the Java version awaited the CompletableFuture
+// fan-out with join(), which had no overall deadline, so a hung downstream could
+// pin the request thread indefinitely. Both branches honour ctx, so capping the
+// context here guarantees wg.Wait() returns within this bound.
+const marketFanoutTimeout = 3 * time.Second
 
 // TrialService implements the legacy trial strategy tree
 // (Root -> Switch -> Market -> Tag -> End, with Error as the fallback branch).
@@ -34,15 +43,19 @@ func (s *TrialService) IndexMarketTrial(ctx context.Context, req *api.MarketProd
 
 	// SwitchNode: downgrade + traffic cut.
 	if s.repo.DowngradeSwitch() {
-		log.Printf("拼团活动降级拦截 %s", req.UserId)
+		log.Printf("[activity] group-buy downgraded, intercepting request userId:%s", req.UserId)
 		return nil, types.NewAppError(types.ResponseE0003)
 	}
 	if !s.repo.CutRange(req.UserId) {
-		log.Printf("拼团活动切量拦截 %s", req.UserId)
+		log.Printf("[activity] group-buy traffic cut, intercepting request userId:%s", req.UserId)
 		return nil, types.NewAppError(types.ResponseE0004)
 	}
 
-	// MarketNode.multiThread: load activity config and SKU concurrently.
+	// MarketNode.multiThread: load activity config and SKU concurrently, bounded by
+	// marketFanoutTimeout so a hung downstream cannot pin the request (legacy defect 9).
+	ctx, cancel := context.WithTimeout(ctx, marketFanoutTimeout)
+	defer cancel()
+
 	var (
 		wg         sync.WaitGroup
 		activityVO *api.GroupBuyActivityDiscountVO
@@ -55,7 +68,7 @@ func (s *TrialService) IndexMarketTrial(ctx context.Context, req *api.MarketProd
 		vo, err := s.loadActivityConfig(ctx, req)
 		if err != nil {
 			// The legacy activity branch swallowed errors into null (-> ErrorNode E0002).
-			log.Printf("异步查询活动配置异常: %v", err)
+			log.Printf("[activity] async activity config query failed: %v", err)
 			vo = nil
 		}
 		activityVO = vo
@@ -77,7 +90,7 @@ func (s *TrialService) IndexMarketTrial(ctx context.Context, req *api.MarketProd
 	discount := activityVO.GroupBuyDiscount
 	calculator, ok := s.discounts.Get(discount.MarketPlan)
 	if !ok {
-		log.Printf("不存在%s类型的折扣计算服务，支持类型为:%v", discount.MarketPlan, s.discounts.Plans())
+		log.Printf("[activity] no discount calculator for market plan %s; supported plans: %v", discount.MarketPlan, s.discounts.Plans())
 		return nil, types.NewAppError(types.ResponseE0001)
 	}
 
@@ -127,7 +140,7 @@ func (s *TrialService) loadActivityConfig(ctx context.Context, req *api.MarketPr
 // marketing (E0002).
 func (s *TrialService) errorNode(req *api.MarketProductEntity, activityVO *api.GroupBuyActivityDiscountVO, skuVO *api.SkuVO) (*api.TrialBalanceEntity, error) {
 	if activityVO == nil || skuVO == nil {
-		log.Printf("商品无拼团营销配置 %s", req.GoodsId)
+		log.Printf("[activity] goods have no group-buy marketing config goodsId:%s", req.GoodsId)
 		return nil, types.NewAppError(types.ResponseE0002)
 	}
 	// Unreachable in practice (a non-nil activityVO always carries a discount), but
@@ -147,7 +160,7 @@ func (s *TrialService) tagNode(ctx context.Context, req *api.MarketProductEntity
 	}
 	isWithin, err := s.repo.IsTagCrowdRange(ctx, tagId, req.UserId)
 	if err != nil {
-		log.Printf("人群标签查询失败 tagId:%s userId:%s err:%v", tagId, req.UserId, err)
+		log.Printf("[activity] crowd tag lookup failed tagId:%s userId:%s err:%v", tagId, req.UserId, err)
 		isWithin = false
 	}
 	return visible || isWithin, enable || isWithin

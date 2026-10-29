@@ -55,7 +55,7 @@ type baseCalculator struct {
 }
 
 func (b baseCalculator) calculate(ctx context.Context, userId string, originalPrice decimal.Decimal, discount *api.GroupBuyDiscount, doCalculate func(decimal.Decimal, *api.GroupBuyDiscount) (decimal.Decimal, error)) (decimal.Decimal, error) {
-	// 1. 人群标签过滤 - 限定人群优惠
+	// 1. Crowd-tag filter: the discount is restricted to a tagged crowd.
 	if discount.DiscountType == types.DiscountTypeTag {
 		inRange, err := b.repo.IsTagCrowdRange(ctx, discount.TagId, userId)
 		if err != nil {
@@ -65,18 +65,18 @@ func (b baseCalculator) calculate(ctx context.Context, userId string, originalPr
 			return originalPrice, nil
 		}
 	}
-	// 2. 折扣优惠计算
+	// 2. Discount calculation.
 	return doCalculate(originalPrice, discount)
 }
 
-// zjCalculator mirrors ZJCalculateService (直减).
+// zjCalculator mirrors ZJCalculateService (direct reduction).
 type zjCalculator struct{ baseCalculator }
 
 func (c *zjCalculator) Calculate(ctx context.Context, userId string, originalPrice decimal.Decimal, discount *api.GroupBuyDiscount) (decimal.Decimal, error) {
 	return c.calculate(ctx, userId, originalPrice, discount, func(op decimal.Decimal, d *api.GroupBuyDiscount) (decimal.Decimal, error) {
 		expr, err := types.ParseMoney(strings.TrimSpace(d.MarketExpr))
 		if err != nil {
-			return decimal.Zero, fmt.Errorf("ZJ 表达式解析失败 %q: %w", d.MarketExpr, err)
+			return decimal.Zero, fmt.Errorf("ZJ expression parse failed %q: %w", d.MarketExpr, err)
 		}
 		pay := op.Sub(expr)
 		if pay.LessThanOrEqual(decimal.Zero) {
@@ -86,24 +86,24 @@ func (c *zjCalculator) Calculate(ctx context.Context, userId string, originalPri
 	})
 }
 
-// mjCalculator mirrors MJCalculateService (满减).
+// mjCalculator mirrors MJCalculateService (threshold-based reduction).
 type mjCalculator struct{ baseCalculator }
 
 func (c *mjCalculator) Calculate(ctx context.Context, userId string, originalPrice decimal.Decimal, discount *api.GroupBuyDiscount) (decimal.Decimal, error) {
 	return c.calculate(ctx, userId, originalPrice, discount, func(op decimal.Decimal, d *api.GroupBuyDiscount) (decimal.Decimal, error) {
 		parts := types.JavaSplit(d.MarketExpr, types.Split)
 		if len(parts) < 2 {
-			return decimal.Zero, fmt.Errorf("MJ 表达式格式错误 %q", d.MarketExpr)
+			return decimal.Zero, fmt.Errorf("MJ expression format invalid %q", d.MarketExpr)
 		}
 		threshold, err := types.ParseMoney(strings.TrimSpace(parts[0]))
 		if err != nil {
-			return decimal.Zero, fmt.Errorf("MJ 门槛解析失败 %q: %w", parts[0], err)
+			return decimal.Zero, fmt.Errorf("MJ threshold parse failed %q: %w", parts[0], err)
 		}
 		reduction, err := types.ParseMoney(strings.TrimSpace(parts[1]))
 		if err != nil {
-			return decimal.Zero, fmt.Errorf("MJ 减额解析失败 %q: %w", parts[1], err)
+			return decimal.Zero, fmt.Errorf("MJ reduction parse failed %q: %w", parts[1], err)
 		}
-		// 不满足最低满减约束，则按照原价
+		// The minimum-threshold condition is not met; charge the original price.
 		if op.LessThan(threshold) {
 			return op, nil
 		}
@@ -115,27 +115,28 @@ func (c *mjCalculator) Calculate(ctx context.Context, userId string, originalPri
 	})
 }
 
-// nCalculator mirrors NCalculateService (N元购): the expression is the final price.
+// nCalculator mirrors NCalculateService (fixed-price purchase): the expression is
+// the final price.
 type nCalculator struct{ baseCalculator }
 
 func (c *nCalculator) Calculate(ctx context.Context, userId string, originalPrice decimal.Decimal, discount *api.GroupBuyDiscount) (decimal.Decimal, error) {
 	return c.calculate(ctx, userId, originalPrice, discount, func(op decimal.Decimal, d *api.GroupBuyDiscount) (decimal.Decimal, error) {
 		pay, err := types.ParseMoney(strings.TrimSpace(d.MarketExpr))
 		if err != nil {
-			return decimal.Zero, fmt.Errorf("N 表达式解析失败 %q: %w", d.MarketExpr, err)
+			return decimal.Zero, fmt.Errorf("N expression parse failed %q: %w", d.MarketExpr, err)
 		}
 		return pay, nil
 	})
 }
 
-// zkCalculator mirrors ZKCalculateService (折扣).
+// zkCalculator mirrors ZKCalculateService (percentage discount).
 type zkCalculator struct{ baseCalculator }
 
 func (c *zkCalculator) Calculate(ctx context.Context, userId string, originalPrice decimal.Decimal, discount *api.GroupBuyDiscount) (decimal.Decimal, error) {
 	return c.calculate(ctx, userId, originalPrice, discount, func(op decimal.Decimal, d *api.GroupBuyDiscount) (decimal.Decimal, error) {
 		rate, err := types.ParseMoney(strings.TrimSpace(d.MarketExpr))
 		if err != nil {
-			return decimal.Zero, fmt.Errorf("ZK 表达式解析失败 %q: %w", d.MarketExpr, err)
+			return decimal.Zero, fmt.Errorf("ZK expression parse failed %q: %w", d.MarketExpr, err)
 		}
 		pay := op.Mul(rate)
 		if pay.LessThanOrEqual(decimal.Zero) {

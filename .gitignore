@@ -1,14 +1,18 @@
-# 构建产物
+# Build artifacts
 /bin/
-# 运行日志
+# Stray root-level compiled binaries (services live under cmd/ and build into /bin/)
+/gateway
+/activity
+/trade
+# Runtime logs
 /logs/
 *.log
 # macOS
 .DS_Store
-# 前端（独立工程）
+# Frontend (independent project)
 /frontend/node_modules/
 /frontend/dist/
-# 工具缓存
+# Tool caches
 .claude/
 .mypy_cache/
 *.pid

@@ -87,3 +87,63 @@ type RefundReply struct {
 	RPCResult
 	Data *RefundMarketPayOrderResponseDTO `json:"data,omitempty"`
 }
+
+// RPCResultRef returns a pointer to the embedded RPCResult, or nil when the
+// receiver itself is nil. Server handlers call it from a deferred metrics hook so
+// that a handler panicking before it assigns the named reply (leaving it nil) does
+// not trigger a secondary nil dereference of &reply.RPCResult. Pointer-receiver
+// methods are safe to invoke on a nil value, which is what makes this guard work.
+func (r *ActivityManageReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for ActivityListReply.
+func (r *ActivityListReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for MarketConfigReply.
+func (r *MarketConfigReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for MarketTrialReply.
+func (r *MarketTrialReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for LockOrderReply.
+func (r *LockOrderReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for SettlementReply.
+func (r *SettlementReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}
+
+// RPCResultRef implements the nil-safe embedded-result accessor for RefundReply.
+func (r *RefundReply) RPCResultRef() *RPCResult {
+	if r == nil {
+		return nil
+	}
+	return &r.RPCResult
+}

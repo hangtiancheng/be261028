@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"math/rand"
+	"time"
 
 	"github.com/hangtiancheng/be261028/internal/api"
 	"github.com/hangtiancheng/be261028/internal/dao"
@@ -29,6 +30,14 @@ func NewActivityRepository(db *gorm.DB, d *dao.DAO, redis *redisx.RedisService, 
 	return &ActivityRepository{db: db, dao: d, redis: redis, dcc: dc}
 }
 
+// cacheTTL bounds the lifetime of activity/discount cache entries.
+//
+// Defect fix (legacy: cached GroupBuyActivity/GroupBuyDiscount entries had no TTL,
+// so a direct database change bypassing the admin API caused permanent stale reads):
+// entries now expire after 30 minutes. Admin writes still invalidate eagerly
+// (see manage_repository.go); this TTL is defence in depth for out-of-band changes.
+const cacheTTL = 30 * time.Minute
+
 // getFromCacheOrDb mirrors AbstractRepository.getFromCacheOrDb: when the DCC cache
 // switch is open it reads through Redis and populates it on a miss; otherwise it
 // queries the database directly. A nil result means "not found".
@@ -38,12 +47,12 @@ func getFromCacheOrDb[T any](ctx context.Context, r *ActivityRepository, cacheKe
 		var cached T
 		found, err := r.redis.GetValue(ctx, cacheKey, &cached)
 		if err != nil {
-			log.Printf("[activity] 缓存读取失败，回源数据库 key:%s err:%v", cacheKey, err)
+			log.Printf("[activity] cache read failed, falling back to database key:%s err:%v", cacheKey, err)
 		} else if found {
 			return &cached, nil
 		}
 	} else {
-		log.Printf("[activity] 缓存降级 %s", cacheKey)
+		log.Printf("[activity] cache bypassed by switch %s", cacheKey)
 	}
 
 	dbResult, err := dbFallback()
@@ -54,8 +63,8 @@ func getFromCacheOrDb[T any](ctx context.Context, r *ActivityRepository, cacheKe
 		return nil, nil
 	}
 	if cacheOpen {
-		if err := r.redis.SetValue(ctx, cacheKey, dbResult); err != nil {
-			log.Printf("[activity] 缓存写入失败 key:%s err:%v", cacheKey, err)
+		if err := r.redis.SetValueWithTTL(ctx, cacheKey, dbResult, cacheTTL); err != nil {
+			log.Printf("[activity] cache write failed key:%s err:%v", cacheKey, err)
 		}
 	}
 	return dbResult, nil
@@ -153,9 +162,12 @@ func (r *ActivityRepository) QuerySCSkuActivityBySCGoodsId(ctx context.Context, 
 // IsTagCrowdRange mirrors ActivityRepository.isTagCrowdRange: a missing bitmap
 // means no restriction (true); otherwise membership is the user's bit.
 //
-// 设计说明（保留旧版 fail-open 语义）：位图缺失通常表示人群任务尚未跑批。若改为
-// fail-closed，种子活动 100123（tag_id='1' 无对应位图）将对所有用户不可见，直接
-// 破坏默认演示链路，属于能力回归；因此这里与旧版一致按"无限制"处理。
+// Design note (the legacy fail-open semantics are preserved on purpose): a missing
+// bitmap usually means the crowd-tag batch job has not run yet. Switching to
+// fail-closed would make the seeded activity 100123 (tag_id='1', no bitmap)
+// invisible to every user and break the default demo path outright -- a capability
+// regression. So, matching the legacy behavior, a missing bitmap means "no
+// restriction".
 func (r *ActivityRepository) IsTagCrowdRange(ctx context.Context, tagId, userId string) (bool, error) {
 	exists, err := r.redis.BitSetExists(ctx, tagId)
 	if err != nil {

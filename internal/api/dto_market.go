@@ -55,18 +55,18 @@ type TeamStatistic struct {
 
 // DifferenceDateTime2Str mirrors GoodsMarketResponseDTO.Team.differenceDateTime2Str:
 // it renders the remaining countdown between start and end as HH:MM:SS, returning
-// "无效的时间" for missing values and "已结束" once the window has passed.
+// "Invalid time" for missing values and "Ended" once the window has passed.
 //
 // Defect fix: the legacy format applied %24 to the hours, silently dropping whole
 // days from windows longer than 24h (a 25h countdown showed as 01:00:00 and a 24h
-// one as 00:00:00). Windows of a day or more are now prefixed with "N天".
+// one as 00:00:00). Windows of a day or more are now prefixed with "Nd ".
 func DifferenceDateTime2Str(validStartTime, validEndTime time.Time) string {
 	if validStartTime.IsZero() || validEndTime.IsZero() {
-		return "无效的时间"
+		return "Invalid time"
 	}
 	diff := validEndTime.Sub(validStartTime)
 	if diff < 0 {
-		return "已结束"
+		return "Ended"
 	}
 	totalSeconds := int64(diff.Seconds())
 	days := totalSeconds / 86400
@@ -74,7 +74,7 @@ func DifferenceDateTime2Str(validStartTime, validEndTime time.Time) string {
 	minutes := (totalSeconds / 60) % 60
 	hours := (totalSeconds / 3600) % 24
 	if days > 0 {
-		return fmt.Sprintf("%d天%02d:%02d:%02d", days, hours, minutes, seconds)
+		return fmt.Sprintf("%dd %02d:%02d:%02d", days, hours, minutes, seconds)
 	}
 	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
 }

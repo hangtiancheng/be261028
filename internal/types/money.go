@@ -56,8 +56,8 @@ func (m Money) Value() (driver.Value, error) { return m.Decimal.Value() }
 // Scan implements sql.Scanner for database reads.
 func (m *Money) Scan(src any) error { return m.Decimal.Scan(src) }
 
-// MinPayPrice is the lowest payable amount ("最低支付1分钱") used by every discount
-// strategy when a calculation would otherwise drop to zero or below.
+// MinPayPrice is the lowest payable amount (a minimum of one cent) used by every
+// discount strategy when a calculation would otherwise drop to zero or below.
 var MinPayPrice = decimal.RequireFromString("0.01")
 
 // ParseMoney parses a decimal amount string, returning an error on malformed input.

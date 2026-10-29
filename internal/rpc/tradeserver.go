@@ -28,8 +28,8 @@ func NewTradeServer(lock *trade.TradeLockOrderService, settlement *trade.TradeSe
 // LockMarketPayOrder mirrors MarketTradeController.lockMarketPayOrder.
 func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarketPayOrderRequestDTO) (reply *api.LockOrderReply, err error) {
 	defer func() {
-		recordRPC("TradeService", "LockMarketPayOrder", &reply.RPCResult, err)
-		metrics.TradeOpsTotal.WithLabelValues("lock", replyCode(&reply.RPCResult)).Inc()
+		recordRPC("TradeService", "LockMarketPayOrder", reply.RPCResultRef(), err)
+		metrics.TradeOpsTotal.WithLabelValues("lock", replyCode(reply.RPCResultRef())).Inc()
 	}()
 	userId := req.UserId
 	source := req.Source
@@ -40,7 +40,7 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 	teamId := req.TeamId
 	notifyConfig := req.NotifyConfigVO
 
-	log.Printf("营销交易锁单:%s LockMarketPayOrderRequestDTO:%+v", userId, req)
+	log.Printf("[trade] lock market pay order request userId:%s req:%+v", userId, req)
 
 	if types.IsBlank(userId) || types.IsBlank(source) || types.IsBlank(channel) ||
 		types.IsBlank(goodsId) || activityId == 0 || notifyConfig == nil ||
@@ -48,13 +48,13 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 		return &api.LockOrderReply{RPCResult: resultFromCode(types.ResponseIllegalParam)}, nil
 	}
 
-	// 查询 outTradeNo 是否已经存在交易记录（幂等）
+	// Idempotency: check whether an unpaid order already exists for this outTradeNo.
 	existing, err := s.lock.QueryNoPayMarketPayOrderByOutTradeNo(ctx, userId, outTradeNo)
 	if err != nil {
 		return &api.LockOrderReply{RPCResult: resultFromError(err)}, nil
 	}
 	if existing != nil {
-		log.Printf("交易锁单记录(存在):%s marketPayOrderEntity:%+v", userId, existing)
+		log.Printf("[trade] lock order already exists userId:%s order:%+v", userId, existing)
 		return &api.LockOrderReply{
 			RPCResult: resultFromCode(types.ResponseSuccess),
 			Data: &api.LockMarketPayOrderResponseDTO{
@@ -67,19 +67,19 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 		}, nil
 	}
 
-	// 判断拼团锁单是否完成了目标
+	// Reject joining a team that has already reached its target.
 	if !types.IsBlank(teamId) {
 		progress, err := s.lock.QueryGroupBuyProgress(ctx, teamId)
 		if err != nil {
 			return &api.LockOrderReply{RPCResult: resultFromError(err)}, nil
 		}
 		if progress != nil && progress.TargetCount == progress.LockCount {
-			log.Printf("交易锁单拦截-拼单目标已达成:%s %s", userId, teamId)
+			log.Printf("[trade] lock intercepted, team target already reached userId:%s teamId:%s", userId, teamId)
 			return &api.LockOrderReply{RPCResult: resultFromCode(types.ResponseE0006)}, nil
 		}
 	}
 
-	// 营销优惠试算（回调 activity 服务）
+	// Trial calculation (callback into the activity service).
 	trialReply, err := s.activityCli.IndexMarketTrial(ctx, &api.MarketProductEntity{
 		ActivityId: &activityId,
 		UserId:     userId,
@@ -95,13 +95,13 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 	}
 	trial := trialReply.Data
 
-	// 人群限定
+	// Crowd targeting gate.
 	if !trial.IsVisible || !trial.IsEnable {
 		return &api.LockOrderReply{RPCResult: resultFromCode(types.ResponseE0007)}, nil
 	}
 
 	discountVO := trial.GroupBuyActivityDiscountVO
-	// 锁单
+	// Lock the order.
 	order, err := s.lock.LockMarketPayOrder(ctx,
 		&trade.UserEntity{UserId: userId},
 		&trade.PayActivityEntity{
@@ -132,7 +132,7 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 		return &api.LockOrderReply{RPCResult: resultFromError(err)}, nil
 	}
 
-	log.Printf("交易锁单记录(新):%s marketPayOrderEntity:%+v", userId, order)
+	log.Printf("[trade] lock order created userId:%s order:%+v", userId, order)
 	return &api.LockOrderReply{
 		RPCResult: resultFromCode(types.ResponseSuccess),
 		Data: &api.LockMarketPayOrderResponseDTO{
@@ -148,10 +148,10 @@ func (s *TradeServer) LockMarketPayOrder(ctx context.Context, req *api.LockMarke
 // SettlementMarketPayOrder mirrors MarketTradeController.settlementMarketPayOrder.
 func (s *TradeServer) SettlementMarketPayOrder(ctx context.Context, req *api.SettlementMarketPayOrderRequestDTO) (reply *api.SettlementReply, err error) {
 	defer func() {
-		recordRPC("TradeService", "SettlementMarketPayOrder", &reply.RPCResult, err)
-		metrics.TradeOpsTotal.WithLabelValues("settlement", replyCode(&reply.RPCResult)).Inc()
+		recordRPC("TradeService", "SettlementMarketPayOrder", reply.RPCResultRef(), err)
+		metrics.TradeOpsTotal.WithLabelValues("settlement", replyCode(reply.RPCResultRef())).Inc()
 	}()
-	log.Printf("营销交易组队结算开始:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
+	log.Printf("[trade] settlement start userId:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
 	if types.IsBlank(req.UserId) || types.IsBlank(req.Source) || types.IsBlank(req.Channel) ||
 		types.IsBlank(req.OutTradeNo) || req.OutTradeTime.IsZero() {
 		return &api.SettlementReply{RPCResult: resultFromCode(types.ResponseIllegalParam)}, nil
@@ -166,7 +166,7 @@ func (s *TradeServer) SettlementMarketPayOrder(ctx context.Context, req *api.Set
 	if err != nil {
 		return &api.SettlementReply{RPCResult: resultFromError(err)}, nil
 	}
-	log.Printf("营销交易组队结算完成:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
+	log.Printf("[trade] settlement complete userId:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
 	return &api.SettlementReply{
 		RPCResult: resultFromCode(types.ResponseSuccess),
 		Data: &api.SettlementMarketPayOrderResponseDTO{
@@ -181,10 +181,10 @@ func (s *TradeServer) SettlementMarketPayOrder(ctx context.Context, req *api.Set
 // RefundMarketPayOrder mirrors MarketTradeController.refundMarketPayOrder.
 func (s *TradeServer) RefundMarketPayOrder(ctx context.Context, req *api.RefundMarketPayOrderRequestDTO) (reply *api.RefundReply, err error) {
 	defer func() {
-		recordRPC("TradeService", "RefundMarketPayOrder", &reply.RPCResult, err)
-		metrics.TradeOpsTotal.WithLabelValues("refund", replyCode(&reply.RPCResult)).Inc()
+		recordRPC("TradeService", "RefundMarketPayOrder", reply.RPCResultRef(), err)
+		metrics.TradeOpsTotal.WithLabelValues("refund", replyCode(reply.RPCResultRef())).Inc()
 	}()
-	log.Printf("营销拼团退单开始:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
+	log.Printf("[trade] refund start userId:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
 	if types.IsBlank(req.UserId) || types.IsBlank(req.OutTradeNo) ||
 		types.IsBlank(req.Source) || types.IsBlank(req.Channel) {
 		return &api.RefundReply{RPCResult: resultFromCode(types.ResponseIllegalParam)}, nil
@@ -198,7 +198,7 @@ func (s *TradeServer) RefundMarketPayOrder(ctx context.Context, req *api.RefundM
 	if err != nil {
 		return &api.RefundReply{RPCResult: resultFromError(err)}, nil
 	}
-	log.Printf("营销拼团退单完成:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
+	log.Printf("[trade] refund complete userId:%s outTradeNo:%s", req.UserId, req.OutTradeNo)
 	return &api.RefundReply{
 		RPCResult: resultFromCode(types.ResponseSuccess),
 		Data: &api.RefundMarketPayOrderResponseDTO{

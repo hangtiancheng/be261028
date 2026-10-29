@@ -41,10 +41,10 @@ func New(activity *rpc.ActivityClient, trade *rpc.TradeClient, dc *dcc.DCC, redi
 
 // Register wires all legacy routes onto the application.
 func (g *Gateway) Register(app *yukinohttp.Application) {
-	// Cross-cutting middleware: CORS + trace id.
-	app.Use(g.cors(), g.traceId())
+	// Cross-cutting middleware: CORS + trace id + request body bound.
+	app.Use(g.cors(), g.traceId(), g.bodyLimit())
 
-	// 活动管理 (AdminController: /api/v1/admin)
+	// Activity administration (AdminController: /api/v1/admin).
 	admin := app.Router("/api/v1/admin")
 	admin.Post("/activity/create", g.handle(g.createActivity))
 	admin.Post("/activity/update", g.handle(g.updateActivity))
@@ -54,21 +54,21 @@ func (g *Gateway) Register(app *yukinohttp.Application) {
 	admin.Post("/activity/enable/:activityId", g.handle(g.enableActivity))
 	admin.Post("/activity/disable/:activityId", g.handle(g.disableActivity))
 
-	// 动态配置 (DCCController: /api/v1/gbm/dcc)
+	// Dynamic config (DCCController: /api/v1/gbm/dcc).
 	dccGroup := app.Router("/api/v1/gbm/dcc")
 	dccGroup.Get("/update_config", g.handle(g.updateConfig))
 
-	// 营销首页 (MarketIndexController: /api/v1/gbm/index)
+	// Market index (MarketIndexController: /api/v1/gbm/index).
 	indexGroup := app.Router("/api/v1/gbm/index")
 	indexGroup.Post("/query_group_buy_market_config", g.handle(g.queryGroupBuyMarketConfig))
 
-	// 营销交易 (MarketTradeController: /api/v1/gbm/trade)
+	// Market trade (MarketTradeController: /api/v1/gbm/trade).
 	tradeGroup := app.Router("/api/v1/gbm/trade")
 	tradeGroup.Post("/lock_market_pay_order", g.handle(g.lockMarketPayOrder))
 	tradeGroup.Post("/settlement_market_pay_order", g.handle(g.settlementMarketPayOrder))
 	tradeGroup.Post("/refund_market_pay_order", g.handle(g.refundMarketPayOrder))
 
-	// 测试回调 (TestApiClientController: /api/v1/test)
+	// Test callback (TestApiClientController: /api/v1/test).
 	testGroup := app.Router("/api/v1/test")
 	testGroup.Post("/group_buy_notify", g.handle(g.groupBuyNotify))
 }
@@ -89,12 +89,12 @@ func (g *Gateway) handle(h func(ctx *yukinohttp.Context)) yukinohttp.Middleware 
 func (g *Gateway) createActivity(ctx *yukinohttp.Context) {
 	var req api.ActivityManageRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(adminFail("创建活动失败", err))
+		ctx.JSON(adminFail("create activity failed", err))
 		return
 	}
 	reply, err := g.activity.CreateActivity(ctx.Request.Context(), &req)
 	if err != nil {
-		ctx.JSON(adminFail("创建活动失败", err))
+		ctx.JSON(adminFail("create activity failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -103,12 +103,12 @@ func (g *Gateway) createActivity(ctx *yukinohttp.Context) {
 func (g *Gateway) updateActivity(ctx *yukinohttp.Context) {
 	var req api.ActivityManageRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
-		ctx.JSON(adminFail("更新活动失败", err))
+		ctx.JSON(adminFail("update activity failed", err))
 		return
 	}
 	reply, err := g.activity.UpdateActivity(ctx.Request.Context(), &req)
 	if err != nil {
-		ctx.JSON(adminFail("更新活动失败", err))
+		ctx.JSON(adminFail("update activity failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -117,12 +117,12 @@ func (g *Gateway) updateActivity(ctx *yukinohttp.Context) {
 func (g *Gateway) deleteActivity(ctx *yukinohttp.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
-		ctx.JSON(adminFail("删除活动失败", errInvalidActivityId))
+		ctx.JSON(adminFail("delete activity failed", errInvalidActivityId))
 		return
 	}
 	reply, err := g.activity.DeleteActivity(ctx.Request.Context(), &api.ActivityIdRequest{ActivityId: activityId})
 	if err != nil {
-		ctx.JSON(adminFail("删除活动失败", err))
+		ctx.JSON(adminFail("delete activity failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -131,12 +131,12 @@ func (g *Gateway) deleteActivity(ctx *yukinohttp.Context) {
 func (g *Gateway) getActivityDetail(ctx *yukinohttp.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
-		ctx.JSON(adminFail("查询活动详情失败", errInvalidActivityId))
+		ctx.JSON(adminFail("get activity detail failed", errInvalidActivityId))
 		return
 	}
 	reply, err := g.activity.GetActivityDetail(ctx.Request.Context(), &api.ActivityIdRequest{ActivityId: activityId})
 	if err != nil {
-		ctx.JSON(adminFail("查询活动详情失败", err))
+		ctx.JSON(adminFail("get activity detail failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -145,7 +145,7 @@ func (g *Gateway) getActivityDetail(ctx *yukinohttp.Context) {
 func (g *Gateway) getActivityList(ctx *yukinohttp.Context) {
 	reply, err := g.activity.GetActivityList(ctx.Request.Context())
 	if err != nil {
-		ctx.JSON(&api.Response{Code: "ERROR", Info: "查询活动列表失败: " + err.Error()})
+		ctx.JSON(&api.Response{Code: "ERROR", Info: "get activity list failed: " + err.Error()})
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -154,12 +154,12 @@ func (g *Gateway) getActivityList(ctx *yukinohttp.Context) {
 func (g *Gateway) enableActivity(ctx *yukinohttp.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
-		ctx.JSON(adminFail("启用活动失败", errInvalidActivityId))
+		ctx.JSON(adminFail("enable activity failed", errInvalidActivityId))
 		return
 	}
 	reply, err := g.activity.EnableActivity(ctx.Request.Context(), &api.ActivityIdRequest{ActivityId: activityId})
 	if err != nil {
-		ctx.JSON(adminFail("启用活动失败", err))
+		ctx.JSON(adminFail("enable activity failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -168,12 +168,12 @@ func (g *Gateway) enableActivity(ctx *yukinohttp.Context) {
 func (g *Gateway) disableActivity(ctx *yukinohttp.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
-		ctx.JSON(adminFail("禁用活动失败", errInvalidActivityId))
+		ctx.JSON(adminFail("disable activity failed", errInvalidActivityId))
 		return
 	}
 	reply, err := g.activity.DisableActivity(ctx.Request.Context(), &api.ActivityIdRequest{ActivityId: activityId})
 	if err != nil {
-		ctx.JSON(adminFail("禁用活动失败", err))
+		ctx.JSON(adminFail("disable activity failed", err))
 		return
 	}
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
@@ -203,7 +203,8 @@ func (g *Gateway) queryGroupBuyMarketConfig(ctx *yukinohttp.Context) {
 		ctx.JSON(&api.Response{Code: types.ResponseUnError.Code, Info: types.ResponseUnError.Info})
 		return
 	}
-	// 限流：每 userId 每秒 1 次，超限返回 RATE_LIMITER（mirrors fallbackMethod）
+	// Rate limit: one request per second per userId; exceeding it returns
+	// RATE_LIMITER (mirrors the legacy fallbackMethod).
 	if !g.indexLimiter.Allow(req.UserId) {
 		ctx.JSON(&api.Response{Code: types.ResponseRateLimiter.Code, Info: types.ResponseRateLimiter.Info})
 		return
@@ -275,6 +276,23 @@ func (g *Gateway) groupBuyNotify(ctx *yukinohttp.Context) {
 
 // ---- middleware ----
 
+// maxBodyBytes bounds inbound request bodies. yukino_http's BindJSON has no
+// built-in size limit, while the legacy Spring stack rejected oversized posts
+// (2MB default); 1MB is far above any legitimate DTO here and keeps a hostile
+// or buggy client from forcing unbounded memory use. Defect fix (hardening).
+const maxBodyBytes = 1 << 20
+
+// bodyLimit wraps the request body in an http.MaxBytesReader so oversized
+// bodies fail at bind time with an error response instead of being buffered.
+func (g *Gateway) bodyLimit() yukinohttp.Middleware {
+	return func(ctx *yukinohttp.Context, next func()) {
+		if ctx.Request.Body != nil {
+			ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxBodyBytes)
+		}
+		next()
+	}
+}
+
 // cors mirrors @CrossOrigin("*").
 func (g *Gateway) cors() yukinohttp.Middleware {
 	return func(ctx *yukinohttp.Context, next func()) {
@@ -325,7 +343,7 @@ func parseActivityId(ctx *yukinohttp.Context) (int64, bool) {
 	return id, true
 }
 
-var errInvalidActivityId = &simpleError{"活动ID非法"}
+var errInvalidActivityId = &simpleError{"invalid activity id"}
 
 type simpleError struct{ msg string }
 
