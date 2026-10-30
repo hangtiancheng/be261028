@@ -50,19 +50,19 @@ the external HTTP gateway:
 
 ### Technology mapping
 
-| Legacy (Java/Spring Boot)          | New (Go)                                                      |
-| ---------------------------------- | ------------------------------------------------------------- |
-| Spring MVC controllers             | yukino_http (gateway)                                         |
-| In-process calls (monolith)        | yukino_rpc (gateway ↔ activity ↔ trade)                       |
-| RabbitMQ (topic exchange)          | Kafka (`team_success` / `team_refund` topics)                 |
-| MyBatis + MySQL                    | GORM (`gorm.io/gorm` + `gorm.io/driver/mysql`)                |
-| Redisson                           | go-redis/v9 (bitmaps, distributed locks, counters)            |
-| BigDecimal                         | shopspring/decimal + `types.Money`                            |
-| SnakeYAML (Spring configuration)   | goccy/go-yaml                                                 |
-| Static HTML/JS/CSS pages           | Vite + Lit 3 + @yukino.js/lit-jsx + Tailwind v4 + motion (``) |
-| DCC dynamic config (Redis pub/sub) | `infra/dcc` (Redis pub/sub)                                   |
-| Actuator + Micrometer              | prometheus/client_golang (`/metrics`)                         |
-| CompletableFuture parallel trials  | goroutines + sync.WaitGroup                                   |
+| Legacy (Java/Spring Boot)          | New (Go)                                                             |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| Spring MVC controllers             | yukino_http (gateway)                                                |
+| In-process calls (monolith)        | yukino_rpc (gateway ↔ activity ↔ trade)                              |
+| RabbitMQ (topic exchange)          | Kafka (`team_success` / `team_refund` topics)                        |
+| MyBatis + MySQL                    | GORM (`gorm.io/gorm` + `gorm.io/driver/mysql`)                       |
+| Redisson                           | go-redis/v9 (bitmaps, distributed locks, counters)                   |
+| BigDecimal                         | shopspring/decimal + `types.Money`                                   |
+| SnakeYAML (Spring configuration)   | goccy/go-yaml                                                        |
+| Static HTML/JS/CSS pages           | Vite + Lit 3 + @yukino.js/lit-jsx + Tailwind v4 + motion (repo root) |
+| DCC dynamic config (Redis pub/sub) | `infra/dcc` (Redis pub/sub)                                          |
+| Actuator + Micrometer              | prometheus/client_golang (`/metrics`)                                |
+| CompletableFuture parallel trials  | goroutines + sync.WaitGroup                                          |
 
 ---
 
@@ -87,9 +87,9 @@ be261028/
 │   ├── trade/        # trade domain: repository / lock / settlement / refund / notify / strategies
 │   ├── rpc/          # yukino_rpc server implementations + client wrappers
 │   └── gateway/      # yukino_http handlers + middleware
-├──          # standalone frontend (Vite + Lit + lit-jsx + Tailwind + motion)
-│   ├── src/{lib,components,pages}     # api/auth/router/toast/art + login/home/admin pages
-│   └── dist/                          # pnpm build output, served statically by the gateway webDir
+├── src/{lib,components,pages}         # frontend (Vite + Lit + lit-jsx + Tailwind + motion): api/auth/router/toast/art + login/home/admin pages
+├── index.html                         # frontend entry page (Vite)
+├── dist/                              # pnpm build output, served statically by the gateway webDir
 ├── configs/{gateway,activity,trade}.yaml
 ├── deployments/sql/be261028.sql           # schema + seed data
 └── deployments/prometheus/scrape-example.yml
@@ -130,15 +130,14 @@ make stop
 Ports: gateway `8091` (also /metrics, /health); activity RPC `19001` / metrics
 `19101`; trade RPC `19002` / metrics `19102`.
 
-### Frontend (standalone project ``)
+### Frontend (repo root)
 
-The frontend is rebuilt as an independent Vite project: Vite + TypeScript +
+The frontend is rebuilt as a Vite project at the repository root: Vite + TypeScript +
 Lit 3 + `@yukino.js/lit-jsx` (JSX-style components) + TailwindCSS v4 (no
 hand-written CSS) + motion animations. It uses no image resources at all — all
 visuals (goods art, avatars) are generated programmatically in `src/lib/art.ts`.
 
 ```bash
-cd frontend
 pnpm install
 pnpm dev      # http://127.0.0.1:5173, /api proxied to the gateway on 8091
 pnpm build    # outputs dist (tsc --noEmit + vite build)
