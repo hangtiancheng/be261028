@@ -18,20 +18,20 @@ bounded contexts, communicating over `yukino_rpc`, with `yukino_http` serving as
 the external HTTP gateway:
 
 ```
-                         ┌──────────────────────────────┐
-   HTTP (yukino_http)    │           gateway             │  :8091
-   /api/v1/...  ───────▶ │  REST→RPC orchestration /     │  /metrics /health
-                         │  rate limit / CORS            │
-                         └──────────┬───────────────────┘
+                         ┌────────────────────────────┐
+   HTTP (yukino_http)    │           gateway          │  :8091
+   /api/v1/...  ───────> │  REST→RPC orchestration / │  /metrics /health
+                         │  rate limit / CORS         │
+                         └──────────┬─────────────────┘
                     yukino_rpc      │        yukino_rpc
                  ┌──────────────────┴───────────────────┐
-                 ▼                                        ▼
-      ┌───────────────────────┐              ┌────────────────────────┐
-      │        activity        │◀─────────────│          trade          │
-      │ admin / trial tree /   │ lock-order   │ lock / settlement /     │
-      │ discounts / crowd tags │ trial calls  │ refund / notify tasks   │
-      │        :19001          │              │        :19002           │
-      └───────┬───────────────┘              └───────┬────────────────┘
+                 V                                      V
+      ┌────────────────────────┐              ┌───────────────────────┐
+      │        activity        │<─────────────│          trade        │
+      │ admin / trial tree /   │ lock-order   │ lock / settlement /   │
+      │ discounts / crowd tags │ trial calls  │ refund / notify tasks │
+      │        :19001          │              │        :19002         │
+      └───────┬────────────────┘              └───────┬───────────────┘
               │                                       │
         MySQL + Redis                          MySQL + Redis + Kafka
 ```
