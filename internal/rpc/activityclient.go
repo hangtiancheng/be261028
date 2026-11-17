@@ -4,18 +4,18 @@ import (
 	"context"
 
 	"github.com/hangtiancheng/be261028/internal/api"
-	yukinorpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
+	yukino_rpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
 )
 
 // ActivityClient is the yukino_rpc client for the activity service. The gateway
 // uses it for admin and index endpoints; the trade service uses it for the trial
 // calculation during order locking.
 type ActivityClient struct {
-	conn *yukinorpc.ClientConn
+	conn *yukino_rpc.ClientConn
 }
 
 // NewActivityClient wraps an established client connection.
-func NewActivityClient(conn *yukinorpc.ClientConn) *ActivityClient {
+func NewActivityClient(conn *yukino_rpc.ClientConn) *ActivityClient {
 	return &ActivityClient{conn: conn}
 }
 

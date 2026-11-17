@@ -4,16 +4,16 @@ import (
 	"context"
 
 	"github.com/hangtiancheng/be261028/internal/api"
-	yukinorpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
+	yukino_rpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
 )
 
 // TradeClient is the yukino_rpc client for the trade service, used by the gateway.
 type TradeClient struct {
-	conn *yukinorpc.ClientConn
+	conn *yukino_rpc.ClientConn
 }
 
 // NewTradeClient wraps an established client connection.
-func NewTradeClient(conn *yukinorpc.ClientConn) *TradeClient {
+func NewTradeClient(conn *yukino_rpc.ClientConn) *TradeClient {
 	return &TradeClient{conn: conn}
 }
 

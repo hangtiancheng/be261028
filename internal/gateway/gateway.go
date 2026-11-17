@@ -16,7 +16,7 @@ import (
 	"github.com/hangtiancheng/be261028/internal/infra/redisx"
 	"github.com/hangtiancheng/be261028/internal/rpc"
 	"github.com/hangtiancheng/be261028/internal/types"
-	yukinohttp "github.com/hangtiancheng/yukino.go/libs/yukino_http"
+	yukino_http "github.com/hangtiancheng/yukino.go/libs/yukino_http"
 )
 
 // Gateway wires the RPC clients and cross-cutting concerns for the HTTP handlers.
@@ -40,7 +40,7 @@ func New(activity *rpc.ActivityClient, trade *rpc.TradeClient, dc *dcc.DCC, redi
 }
 
 // Register wires all legacy routes onto the application.
-func (g *Gateway) Register(app *yukinohttp.Application) {
+func (g *Gateway) Register(app *yukino_http.Application) {
 	// Cross-cutting middleware: CORS + trace id + request body bound.
 	app.Use(g.cors(), g.traceId(), g.bodyLimit())
 
@@ -74,8 +74,8 @@ func (g *Gateway) Register(app *yukinohttp.Application) {
 }
 
 // handle wraps a handler to record HTTP metrics.
-func (g *Gateway) handle(h func(ctx *yukinohttp.Context)) yukinohttp.Middleware {
-	return func(ctx *yukinohttp.Context, next func()) {
+func (g *Gateway) handle(h func(ctx *yukino_http.Context)) yukino_http.Middleware {
+	return func(ctx *yukino_http.Context, next func()) {
 		h(ctx)
 		metrics.HTTPRequestsTotal.WithLabelValues(ctx.Path, strconv.Itoa(ctx.Status)).Inc()
 		if next != nil {
@@ -86,7 +86,7 @@ func (g *Gateway) handle(h func(ctx *yukinohttp.Context)) yukinohttp.Middleware 
 
 // ---- admin handlers ----
 
-func (g *Gateway) createActivity(ctx *yukinohttp.Context) {
+func (g *Gateway) createActivity(ctx *yukino_http.Context) {
 	var req api.ActivityManageRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(adminFail("create activity failed", err))
@@ -100,7 +100,7 @@ func (g *Gateway) createActivity(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) updateActivity(ctx *yukinohttp.Context) {
+func (g *Gateway) updateActivity(ctx *yukino_http.Context) {
 	var req api.ActivityManageRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(adminFail("update activity failed", err))
@@ -114,7 +114,7 @@ func (g *Gateway) updateActivity(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) deleteActivity(ctx *yukinohttp.Context) {
+func (g *Gateway) deleteActivity(ctx *yukino_http.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
 		ctx.JSON(adminFail("delete activity failed", errInvalidActivityId))
@@ -128,7 +128,7 @@ func (g *Gateway) deleteActivity(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) getActivityDetail(ctx *yukinohttp.Context) {
+func (g *Gateway) getActivityDetail(ctx *yukino_http.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
 		ctx.JSON(adminFail("get activity detail failed", errInvalidActivityId))
@@ -142,7 +142,7 @@ func (g *Gateway) getActivityDetail(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) getActivityList(ctx *yukinohttp.Context) {
+func (g *Gateway) getActivityList(ctx *yukino_http.Context) {
 	reply, err := g.activity.GetActivityList(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(&api.Response{Code: "ERROR", Info: "get activity list failed: " + err.Error()})
@@ -151,7 +151,7 @@ func (g *Gateway) getActivityList(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) enableActivity(ctx *yukinohttp.Context) {
+func (g *Gateway) enableActivity(ctx *yukino_http.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
 		ctx.JSON(adminFail("enable activity failed", errInvalidActivityId))
@@ -165,7 +165,7 @@ func (g *Gateway) enableActivity(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) disableActivity(ctx *yukinohttp.Context) {
+func (g *Gateway) disableActivity(ctx *yukino_http.Context) {
 	activityId, ok := parseActivityId(ctx)
 	if !ok {
 		ctx.JSON(adminFail("disable activity failed", errInvalidActivityId))
@@ -181,7 +181,7 @@ func (g *Gateway) disableActivity(ctx *yukinohttp.Context) {
 
 // ---- DCC handler ----
 
-func (g *Gateway) updateConfig(ctx *yukinohttp.Context) {
+func (g *Gateway) updateConfig(ctx *yukino_http.Context) {
 	key := ctx.Query("key")
 	value := ctx.Query("value")
 	if key == "" {
@@ -197,7 +197,7 @@ func (g *Gateway) updateConfig(ctx *yukinohttp.Context) {
 
 // ---- index handler ----
 
-func (g *Gateway) queryGroupBuyMarketConfig(ctx *yukinohttp.Context) {
+func (g *Gateway) queryGroupBuyMarketConfig(ctx *yukino_http.Context) {
 	var req api.GoodsMarketRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(&api.Response{Code: types.ResponseUnError.Code, Info: types.ResponseUnError.Info})
@@ -219,7 +219,7 @@ func (g *Gateway) queryGroupBuyMarketConfig(ctx *yukinohttp.Context) {
 
 // ---- trade handlers ----
 
-func (g *Gateway) lockMarketPayOrder(ctx *yukinohttp.Context) {
+func (g *Gateway) lockMarketPayOrder(ctx *yukino_http.Context) {
 	var req api.LockMarketPayOrderRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(&api.Response{Code: types.ResponseUnError.Code, Info: types.ResponseUnError.Info})
@@ -233,7 +233,7 @@ func (g *Gateway) lockMarketPayOrder(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) settlementMarketPayOrder(ctx *yukinohttp.Context) {
+func (g *Gateway) settlementMarketPayOrder(ctx *yukino_http.Context) {
 	var req api.SettlementMarketPayOrderRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(&api.Response{Code: types.ResponseUnError.Code, Info: types.ResponseUnError.Info})
@@ -247,7 +247,7 @@ func (g *Gateway) settlementMarketPayOrder(ctx *yukinohttp.Context) {
 	ctx.JSON(toResponse(&reply.RPCResult, reply.Data))
 }
 
-func (g *Gateway) refundMarketPayOrder(ctx *yukinohttp.Context) {
+func (g *Gateway) refundMarketPayOrder(ctx *yukino_http.Context) {
 	var req api.RefundMarketPayOrderRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.JSON(&api.Response{Code: types.ResponseUnError.Code, Info: types.ResponseUnError.Info})
@@ -265,7 +265,7 @@ func (g *Gateway) refundMarketPayOrder(ctx *yukinohttp.Context) {
 
 // groupBuyNotify mirrors TestApiClientController.groupBuyNotify: a fake third-party
 // callback receiver that always answers "success".
-func (g *Gateway) groupBuyNotify(ctx *yukinohttp.Context) {
+func (g *Gateway) groupBuyNotify(ctx *yukino_http.Context) {
 	var req api.NotifyRequestDTO
 	if err := ctx.BindJSON(&req); err != nil {
 		ctx.String("error")
@@ -284,8 +284,8 @@ const maxBodyBytes = 1 << 20
 
 // bodyLimit wraps the request body in an http.MaxBytesReader so oversized
 // bodies fail at bind time with an error response instead of being buffered.
-func (g *Gateway) bodyLimit() yukinohttp.Middleware {
-	return func(ctx *yukinohttp.Context, next func()) {
+func (g *Gateway) bodyLimit() yukino_http.Middleware {
+	return func(ctx *yukino_http.Context, next func()) {
 		if ctx.Request.Body != nil {
 			ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxBodyBytes)
 		}
@@ -294,8 +294,8 @@ func (g *Gateway) bodyLimit() yukinohttp.Middleware {
 }
 
 // cors mirrors @CrossOrigin("*").
-func (g *Gateway) cors() yukinohttp.Middleware {
-	return func(ctx *yukinohttp.Context, next func()) {
+func (g *Gateway) cors() yukino_http.Middleware {
+	return func(ctx *yukino_http.Context, next func()) {
 		ctx.Set("Access-Control-Allow-Origin", "*")
 		ctx.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		ctx.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -308,8 +308,8 @@ func (g *Gateway) cors() yukinohttp.Middleware {
 }
 
 // traceId mirrors TraceIdFilter: attach a request-scoped trace id.
-func (g *Gateway) traceId() yukinohttp.Middleware {
-	return func(ctx *yukinohttp.Context, next func()) {
+func (g *Gateway) traceId() yukino_http.Middleware {
+	return func(ctx *yukino_http.Context, next func()) {
 		traceId := ctx.Get("trace-id")
 		if traceId == "" {
 			traceId = newTraceId()
@@ -335,7 +335,7 @@ func adminFail(prefix string, err error) *api.Response {
 	}
 }
 
-func parseActivityId(ctx *yukinohttp.Context) (int64, bool) {
+func parseActivityId(ctx *yukino_http.Context) (int64, bool) {
 	id, err := strconv.ParseInt(ctx.Param("activityId"), 10, 64)
 	if err != nil {
 		return 0, false

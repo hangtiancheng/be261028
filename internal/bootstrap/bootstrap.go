@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/hangtiancheng/be261028/internal/config"
-	yukinorpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
+	yukino_rpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
 )
 
 // ConfigPath parses the -config flag with the supplied default.
@@ -48,12 +48,12 @@ func SignalContext() context.Context {
 
 // ServeRPC starts a yukino_rpc server on addr with the given service registered
 // under name. It returns the server (for graceful stop) once the listener is up.
-func ServeRPC(addr, name string, service any) (*yukinorpc.Server, error) {
+func ServeRPC(addr, name string, service any) (*yukino_rpc.Server, error) {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("listen rpc %s: %w", addr, err)
 	}
-	server := yukinorpc.NewServer()
+	server := yukino_rpc.NewServer()
 	server.Register(name, service)
 	go func() {
 		if err := server.Serve(lis); err != nil {

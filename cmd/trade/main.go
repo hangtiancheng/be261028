@@ -24,7 +24,7 @@ import (
 	"github.com/hangtiancheng/be261028/internal/infra/redisx"
 	"github.com/hangtiancheng/be261028/internal/rpc"
 	"github.com/hangtiancheng/be261028/internal/trade"
-	yukinorpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
+	yukino_rpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
 )
 
 func main() {
@@ -72,7 +72,7 @@ func main() {
 	tradeRepo := trade.NewTradeRepository(gdb, d, redis, dccService, cfg.Kafka.TopicTeamSuccess, cfg.Kafka.TopicTeamRefund)
 
 	// activity RPC client (lock-order trial callback).
-	activityConn, err := yukinorpc.Dial(cfg.RPC.ActivityTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
+	activityConn, err := yukino_rpc.Dial(cfg.RPC.ActivityTarget, yukino_rpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
 		log.Fatalf("[trade] failed to connect to the activity service: %v", err)
 	}

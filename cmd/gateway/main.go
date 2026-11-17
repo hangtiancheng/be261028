@@ -16,8 +16,8 @@ import (
 	"github.com/hangtiancheng/be261028/internal/infra/dcc"
 	"github.com/hangtiancheng/be261028/internal/infra/redisx"
 	"github.com/hangtiancheng/be261028/internal/rpc"
-	yukinohttp "github.com/hangtiancheng/yukino.go/libs/yukino_http"
-	yukinorpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
+	yukino_http "github.com/hangtiancheng/yukino.go/libs/yukino_http"
+	yukino_rpc "github.com/hangtiancheng/yukino.go/libs/yukino_rpc/pkg/rpc"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -39,12 +39,12 @@ func main() {
 	dccService := dcc.New(cfg.DCC.Topic, cfg.DCC.Defaults)
 
 	// RPC clients.
-	activityConn, err := yukinorpc.Dial(cfg.RPC.ActivityTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
+	activityConn, err := yukino_rpc.Dial(cfg.RPC.ActivityTarget, yukino_rpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
 		log.Fatalf("[gateway] failed to connect to the activity service: %v", err)
 	}
 	defer activityConn.Close()
-	tradeConn, err := yukinorpc.Dial(cfg.RPC.TradeTarget, yukinorpc.WithTimeout(cfg.RPC.Timeout))
+	tradeConn, err := yukino_rpc.Dial(cfg.RPC.TradeTarget, yukino_rpc.WithTimeout(cfg.RPC.Timeout))
 	if err != nil {
 		log.Fatalf("[gateway] failed to connect to the trade service: %v", err)
 	}
@@ -54,7 +54,7 @@ func main() {
 	tradeCli := rpc.NewTradeClient(tradeConn)
 
 	// HTTP application.
-	app := yukinohttp.Default()
+	app := yukino_http.Default()
 	gw := gateway.New(activityCli, tradeCli, dccService, redis)
 	gw.Register(app)
 	mountOps(app)
@@ -85,9 +85,9 @@ func main() {
 
 // mountOps exposes Prometheus metrics and a health probe on the main HTTP port,
 // mirroring the legacy actuator endpoints.
-func mountOps(app *yukinohttp.Application) {
+func mountOps(app *yukino_http.Application) {
 	promHandler := promhttp.Handler()
-	app.Get("/metrics", func(ctx *yukinohttp.Context, next func()) {
+	app.Get("/metrics", func(ctx *yukino_http.Context, next func()) {
 		// TakeOver disables deferred rendering (which would otherwise promote the
 		// implicit 404 to 200). Record the real status so the access logger and
 		// metrics middleware report 200 instead of a misleading 404.
@@ -95,8 +95,8 @@ func mountOps(app *yukinohttp.Application) {
 		ctx.TakeOver()
 		promHandler.ServeHTTP(ctx.Writer, ctx.Request)
 	})
-	app.Get("/health", func(ctx *yukinohttp.Context, next func()) {
-		ctx.JSON(yukinohttp.H{"status": "UP"})
+	app.Get("/health", func(ctx *yukino_http.Context, next func()) {
+		ctx.JSON(yukino_http.H{"status": "UP"})
 	})
 }
 
@@ -106,12 +106,12 @@ func mountOps(app *yukinohttp.Application) {
 // so the bare "/" gets its own handler that serves index.html directly (a redirect
 // to /index.html would loop, because http.FileServer canonicalises /index.html
 // back to /).
-func mountWeb(app *yukinohttp.Application, webDir string) {
+func mountWeb(app *yukino_http.Application, webDir string) {
 	if webDir == "" {
 		return
 	}
 	app.Static("/", webDir)
-	app.Get("/", func(ctx *yukinohttp.Context, next func()) {
+	app.Get("/", func(ctx *yukino_http.Context, next func()) {
 		ctx.SetStatus(http.StatusOK)
 		ctx.TakeOver()
 		http.ServeFile(ctx.Writer, ctx.Request, filepath.Join(webDir, "index.html"))

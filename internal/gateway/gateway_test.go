@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/hangtiancheng/be261028/internal/api"
-	yukinohttp "github.com/hangtiancheng/yukino.go/libs/yukino_http"
+	yukino_http "github.com/hangtiancheng/yukino.go/libs/yukino_http"
 )
 
 // TestBodyLimitBoundsRequestSize pins the hardening fix: yukino_http's BindJSON
@@ -18,10 +18,10 @@ import (
 // http.MaxBytesReader. Oversized bodies must fail at bind time; normal bodies
 // must be unaffected.
 func TestBodyLimitBoundsRequestSize(t *testing.T) {
-	app := yukinohttp.New()
+	app := yukino_http.New()
 	g := &Gateway{}
 	app.Use(g.bodyLimit())
-	app.Post("/echo", func(ctx *yukinohttp.Context, next func()) {
+	app.Post("/echo", func(ctx *yukino_http.Context, next func()) {
 		var payload struct {
 			Data string `json:"data"`
 		}
