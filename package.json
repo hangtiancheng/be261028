@@ -15,7 +15,7 @@
     "git:push": "pnpm git:commit && git push origin main"
   },
   "dependencies": {
-    "@yukino.js/lit-jsx": "latest",
+    "@yukino.js/lit-jsx": "file:../yukino.js/packages/lit-jsx",
     "lit": "^3.3.3",
     "motion": "^14.9.0"
   },
