@@ -11,8 +11,13 @@ import {
 } from "../lib/api";
 import { genAvatarArt, genProductArt, genQrArt } from "../lib/art";
 import { clearUsername, getUsername } from "../lib/auth";
-import { ICONS, svgIcon } from "../lib/icons";
-import { navigate, onRouteChange } from "../lib/router";
+import { ICONS } from "../lib/icons";
+import { icon } from "@yukino.js/lit-jsx/community";
+import {
+  navigate,
+  router,
+  useSearchParams,
+} from "@yukino.js/lit-jsx/community";
 import { toast } from "../lib/toast";
 import { fmtPrice, newOutTradeNo, parseTime } from "../lib/utils";
 import { UiElement } from "../components/base";
@@ -20,8 +25,6 @@ import { Carousel } from "../components/carousel";
 import { CountDown } from "../components/countdown";
 
 const DEFAULT_GOODS_ID = "9890001";
-
-/** Demo goods with seeded campaigns, offered by the goods switcher pills. */
 const DEMO_GOODS = ["9890001", "9890002"];
 
 const PRODUCT_TITLES: Record<string, string> = {
@@ -30,29 +33,14 @@ const PRODUCT_TITLES: Record<string, string> = {
   "9890002": "Two-Person Group-Buy Demo Goods — Marketing Showcase Kit",
 };
 
-/**
- * Background refresh cadence. The market-config endpoint is rate limited at
- * 1 req/s per user, so we never poll faster than every 3 seconds.
- */
 const POLL_INTERVAL_MS = 3000;
 
-/**
- * Supports ?goodsId=<id> (defaults to 9890001). The hash query wins over the
- * search query so the goods switcher can navigate within the SPA without a
- * stale location.search overriding the selection.
- */
 function resolveGoodsId(): string {
-  let q: string | null = null;
-  if (location.hash.includes("?")) {
-    q = new URLSearchParams(
-      location.hash.slice(location.hash.indexOf("?")),
-    ).get("goodsId");
-  }
-  if (!q) q = new URLSearchParams(location.search).get("goodsId");
+  const [params] = useSearchParams();
+  const q = params.get("goodsId");
   return q && q.trim() ? q.trim() : DEFAULT_GOODS_ID;
 }
 
-/** Home page: goods detail + group-buy teams + the lock → settle → refund trade flow. */
 @customElement("x-home-page")
 export class HomePage extends UiElement {
   @state() private loading = true;
@@ -61,14 +49,12 @@ export class HomePage extends UiElement {
   @state() private payOpen = false;
   @state() private paying = false;
   @state() private locking = false;
-  /** Solo ("buy alone") payment: simulated list-price payment, no group order. */
   @state() private paySolo = false;
   @state() private payAmount = "0.00";
   @state() private payOutTradeNo = "";
   @state() private pendingOutTradeNo = "";
   @state() private settledOutTradeNo = "";
   @state() private goodsId: string = resolveGoodsId();
-  /** Carousel artwork: generated on canvas from a goodsId-derived seed; no image files. */
   @state() private carouselImages: string[] = [0, 1, 2].map((i) =>
     genProductArt(`${resolveGoodsId()}-${i}`),
   );
@@ -78,13 +64,10 @@ export class HomePage extends UiElement {
   private animatedCards = new WeakSet<Element>();
   private me: string | null = getUsername();
   private routeUnsub?: () => void;
-
   private pollTimer?: number;
   private inFlight = false;
   private lastQueryAt = 0;
 
-  /** localStorage keys: the pending (unpaid) trade number survives refreshes;
-   *  the settled trade number keeps the refund action reachable for joiners. */
   private get pendingKey(): string {
     return `be261028:pending:${this.me}:${this.goodsId}`;
   }
@@ -105,7 +88,7 @@ export class HomePage extends UiElement {
     try {
       localStorage.setItem(this.pendingKey, outTradeNo);
     } catch {
-      /* storage errors are non-fatal */
+      /* non-fatal */
     }
     this.pendingOutTradeNo = outTradeNo;
   }
@@ -114,7 +97,7 @@ export class HomePage extends UiElement {
     try {
       localStorage.removeItem(this.pendingKey);
     } catch {
-      /* storage errors are non-fatal */
+      /* non-fatal */
     }
     this.pendingOutTradeNo = "";
   }
@@ -123,7 +106,7 @@ export class HomePage extends UiElement {
     try {
       localStorage.setItem(this.settledKey, outTradeNo);
     } catch {
-      /* storage errors are non-fatal */
+      /* non-fatal */
     }
     this.settledOutTradeNo = outTradeNo;
   }
@@ -132,7 +115,7 @@ export class HomePage extends UiElement {
     try {
       localStorage.removeItem(this.settledKey);
     } catch {
-      /* storage errors are non-fatal */
+      /* non-fatal */
     }
     this.settledOutTradeNo = "";
   }
@@ -143,14 +126,11 @@ export class HomePage extends UiElement {
       navigate("/login", { replace: true });
       return;
     }
-    // In-app goods switching: the switcher navigates the hash query, and the
-    // route listener swaps the goods without a full page reload.
-    this.routeUnsub = onRouteChange(() => {
+    this.routeUnsub = router.onChange(() => {
       const id = resolveGoodsId();
       if (id !== this.goodsId) this.applyGoods(id);
     });
     void this.load(false);
-    // Silent background refresh so team seats and countdowns stay current.
     this.pollTimer = window.setInterval(() => {
       if (document.hidden || this.inFlight || !this.data) return;
       if (Date.now() - this.lastQueryAt < POLL_INTERVAL_MS) return;
@@ -160,10 +140,7 @@ export class HomePage extends UiElement {
       animate(
         this,
         { opacity: [0, 1], transform: ["translateY(10px)", "translateY(0)"] },
-        {
-          duration: 0.4,
-          ease: [0.22, 1, 0.36, 1],
-        },
+        { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
       );
     });
   }
@@ -174,7 +151,6 @@ export class HomePage extends UiElement {
     this.routeUnsub?.();
   }
 
-  /** Swaps the active goods in place (hash-query driven; no page reload). */
   private applyGoods(id: string): void {
     this.goodsId = id;
     this.carouselImages = [0, 1, 2].map((i) => genProductArt(`${id}-${i}`));
@@ -197,23 +173,18 @@ export class HomePage extends UiElement {
         this.data = res.data;
         this.errorMsg = "";
       } else if (res.code === "0006" && retryOnRateLimit) {
-        // Per-user rate limit (1 req/s): back off briefly and retry once instead
-        // of rendering the limiter as an error page.
         window.setTimeout(() => void this.load(silent, false), 1100);
       } else if (!silent) {
         this.errorMsg = friendlyError(res.code, res.info);
       }
     } catch {
-      if (!silent)
-        this.errorMsg =
-          "Network error — please make sure the gateway is running.";
+      if (!silent) this.errorMsg = "Network error — please check the gateway.";
     }
     this.loading = false;
     this.inFlight = false;
   }
 
   protected override updated(): void {
-    // Team-card entrance: only newly added cards animate (staggered).
     const fresh: HTMLElement[] = [];
     this.querySelectorAll<HTMLElement>(".team-card").forEach((el) => {
       if (!this.animatedCards.has(el)) {
@@ -234,10 +205,6 @@ export class HomePage extends UiElement {
     return this.data?.teamList?.find((t) => t.userId === this.me) ?? null;
   }
 
-  /**
-   * Hide teams that are full or expired; my own team always stays visible so
-   * the refund action remains reachable.
-   */
   private isTeamVisible(t: Team): boolean {
     if (t.userId === this.me) return true;
     const full = t.lockCount >= t.targetCount;
@@ -250,28 +217,21 @@ export class HomePage extends UiElement {
 
   private switchGoods(id: string): void {
     if (id === this.goodsId) return;
-    // Always carry the goodsId in the hash query so it wins over any stale
-    // ?goodsId= in location.search (see resolveGoodsId).
     navigate(`/?goodsId=${id}`);
   }
 
-  /** Start a team / join one: if I am already in a team, resume my own order (idempotent, parity with legacy). */
   private async startOrJoin(teamId?: string): Promise<void> {
     if (!this.data || this.locking) return;
     const own = this.ownTeam;
     if (own) {
-      // Owner team entries carry outTradeNo; random-sampled entries of other
-      // users do not. Fall back to the locally persisted pending trade number.
       const resumeNo = own.outTradeNo || this.pendingOutTradeNo;
       if (resumeNo && resumeNo === this.settledOutTradeNo) {
-        // The seat is already paid — reopening the cashier would only produce
-        // a duplicate-settlement error, so explain instead.
-        toast.info("You already paid for your seat in this campaign");
+        toast.info("Already paid for this campaign");
       } else if (resumeNo) {
         this.savePending(resumeNo);
         this.openPay(fmtPrice(this.data.goods.payPrice), resumeNo);
       } else {
-        toast.info("You already have a seat in this campaign");
+        toast.info("You already have a seat");
       }
       return;
     }
@@ -292,7 +252,6 @@ export class HomePage extends UiElement {
           fmtPrice(res.data?.payPrice ?? this.data.goods.payPrice),
           outTradeNo,
         );
-        // Refresh the team list once the new lock is visible upstream.
         window.setTimeout(() => void this.load(true), 1200);
       } else {
         toast.error(friendlyError(res.code, res.info));
@@ -304,12 +263,6 @@ export class HomePage extends UiElement {
     this.locking = false;
   }
 
-  /**
-   * "Buy alone" (legacy parity): shows the cashier at the list price without
-   * creating a group order — the backend has no solo-purchase API, so the
-   * payment is simulated locally (the legacy page behaved the same way: modal
-   * only, no lock_market_pay_order call).
-   */
   private buyAlone(): void {
     if (!this.data || this.locking) return;
     this.paySolo = true;
@@ -369,8 +322,7 @@ export class HomePage extends UiElement {
   private async confirmPay(): Promise<void> {
     if (this.paying) return;
     if (this.paySolo) {
-      // Simulated list-price purchase: no group order exists to settle.
-      toast.success("Solo purchase completed (simulated)");
+      toast.success("Solo purchase completed");
       this.closePay();
       return;
     }
@@ -378,15 +330,13 @@ export class HomePage extends UiElement {
     try {
       const res = await api.settle(this.me!, this.payOutTradeNo);
       if (res.code === "0000") {
-        toast.success("Payment settled — team progress +1");
+        toast.success("Payment settled");
         this.saveSettled(this.payOutTradeNo);
         this.clearPending();
         this.closePay();
         void this.load(true);
       } else {
         toast.error(friendlyError(res.code, res.info));
-        // A business failure (e.g. order already settled/refunded) means the
-        // pending trade number is no longer usable — drop it to stop nagging.
         this.clearPending();
       }
     } catch {
@@ -395,7 +345,6 @@ export class HomePage extends UiElement {
     this.paying = false;
   }
 
-  /** Cancel an unpaid pending order: refund releases the locked seat upstream. */
   private async cancelPending(): Promise<void> {
     const outTradeNo = this.pendingOutTradeNo;
     this.clearPending();
@@ -403,14 +352,14 @@ export class HomePage extends UiElement {
     try {
       const res = await api.refund(this.me!, outTradeNo);
       if (res.code === "0000" && res.data?.code === "repeat") {
-        toast.info("That order was already refunded");
+        toast.info("Order already refunded");
       } else if (res.code === "0000") {
-        toast.info("Pending order cancelled — your seat has been released");
+        toast.info("Order cancelled — seat released");
       } else {
-        toast.info("Pending order discarded");
+        toast.info("Order discarded");
       }
     } catch {
-      toast.info("Pending order discarded");
+      toast.info("Order discarded");
     }
     void this.load(true);
   }
@@ -420,9 +369,9 @@ export class HomePage extends UiElement {
       const res = await api.refund(this.me!, outTradeNo);
       if (res.code === "0000") {
         if (res.data?.code === "success") {
-          toast.success("Refund successful — your seat has been released");
+          toast.success("Refund successful — seat released");
         } else if (res.data?.code === "repeat") {
-          toast.info("This order was already refunded");
+          toast.info("Order already refunded");
         } else {
           toast.info(res.data?.info ?? "Refund processed");
         }
@@ -442,6 +391,33 @@ export class HomePage extends UiElement {
     navigate("/login", { replace: true });
   }
 
+  private renderBuyButtons(d: MarketConfig, cls = "") {
+    return (
+      <div className={`flex gap-3 ${cls}`}>
+        <button
+          onClick={() => this.buyAlone()}
+          disabled={this.locking}
+          className="pressable flex-1 rounded-2xl border-2 border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-600 hover:border-brand-200 hover:text-zinc-800 disabled:opacity-60"
+        >
+          Buy solo
+          <span className="ml-1 text-xs font-medium text-zinc-400">
+            ¥{fmtPrice(d.goods.originalPrice)}
+          </span>
+        </button>
+        <button
+          onClick={() => void this.startOrJoin()}
+          disabled={this.locking}
+          className="pressable flex-1 rounded-2xl bg-gradient-to-r from-brand-500 to-orange-400 py-3 text-sm font-black text-white shadow-brand hover:brightness-105 disabled:opacity-60"
+        >
+          Start a team
+          <span className="ml-1 text-xs font-semibold text-white/85">
+            ¥{fmtPrice(d.goods.payPrice)}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   render() {
     if (!this.me) return null;
     const d = this.data;
@@ -449,32 +425,26 @@ export class HomePage extends UiElement {
     const stat = d?.teamStatistic;
 
     return (
-      <div className="min-h-dvh bg-zinc-200/70">
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-zinc-50 shadow-2xl shadow-zinc-900/10 lg:max-w-6xl xl:max-w-7xl">
-          {/* Top bar */}
-          <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-zinc-200/60 bg-zinc-50/85 px-4 py-3 backdrop-blur lg:px-8">
+      <div className="app-shell min-h-dvh">
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-zinc-50/95 shadow-2xl shadow-zinc-900/10 ring-1 ring-zinc-900/5 lg:max-w-6xl xl:max-w-7xl">
+          <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-zinc-200/70 bg-zinc-50/85 px-4 py-3 backdrop-blur-xl lg:px-8">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-orange-400 text-white shadow-md shadow-brand-500/30">
-                {unsafeHTML(svgIcon(ICONS.cart, "h-5 w-5"))}
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-orange-400 text-white shadow-brand">
+                {unsafeHTML(icon(ICONS.cart, "h-5 w-5"))}
               </span>
-              <div>
-                <div className="text-sm font-black leading-none text-zinc-900">
-                  be261028 Group Buy
-                </div>
-                <div className="mt-1 text-[10px] text-zinc-400">
-                  Team up and pay less
-                </div>
-              </div>
+              <span className="text-sm font-black tracking-tight text-zinc-900">
+                be261028 Group Buy
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              {/* Demo goods switcher (drives ?goodsId=) */}
-              <div className="hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 md:flex">
+            <div className="flex items-center gap-2">
+              <div className="hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 shadow-sm md:flex">
                 {DEMO_GOODS.map((id) => (
                   <button
+                    key={id}
                     onClick={() => this.switchGoods(id)}
-                    className={`rounded-full px-2.5 py-1 font-mono text-[10px] font-semibold transition ${
+                    className={`pill-button px-2.5 py-1 font-mono text-[10px] ${
                       id === this.goodsId
-                        ? "bg-gradient-to-r from-brand-500 to-orange-400 text-white shadow"
+                        ? "bg-gradient-to-r from-brand-500 to-orange-400 text-white shadow-sm"
                         : "text-zinc-400 hover:text-zinc-700"
                     }`}
                   >
@@ -484,16 +454,23 @@ export class HomePage extends UiElement {
               </div>
               <button
                 onClick={() => navigate("/admin")}
-                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 transition hover:border-brand-300 hover:text-brand-600"
+                className="pill-button border border-zinc-200 bg-white px-3.5 py-1.5 text-xs text-zinc-500 shadow-sm hover:border-brand-300 hover:text-brand-600"
               >
-                Admin console
+                {unsafeHTML(icon(ICONS.sliders, "h-3.5 w-3.5"))}
+                Admin
               </button>
               <button
                 onClick={() => this.logout()}
-                className="flex items-center gap-1 rounded-full px-2 py-1.5 text-xs text-zinc-400 transition hover:text-brand-600"
+                aria-label={`Sign out ${this.me}`}
+                className="pressable flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white py-1 pl-1 pr-2.5 text-xs font-semibold text-zinc-600 shadow-sm hover:border-brand-300 hover:text-brand-600"
               >
+                <img
+                  src={genAvatarArt(this.me)}
+                  alt=""
+                  className="h-6 w-6 rounded-full ring-1 ring-zinc-200"
+                />
                 {this.me}
-                {unsafeHTML(svgIcon(ICONS.logout, "h-3.5 w-3.5"))}
+                {unsafeHTML(icon(ICONS.logout, "h-3.5 w-3.5 text-zinc-400"))}
               </button>
             </div>
           </header>
@@ -505,109 +482,77 @@ export class HomePage extends UiElement {
                 ? this.renderError()
                 : d && (
                     <>
-                      {/* Left column: generated gallery (sticky on desktop) */}
                       <div className="lg:sticky lg:top-24 lg:col-span-5 xl:col-span-4">
                         <Carousel images={this.carouselImages} />
                       </div>
 
-                      {/* Right column: goods info, statistics, teams */}
                       <div className="lg:col-span-7 lg:min-w-0 xl:col-span-8">
-                        <section className="mt-4 rounded-3xl bg-white p-4 shadow-sm lg:mt-0 lg:p-6">
-                          <div className="flex items-end gap-2">
+                        <section className="surface mt-4 p-4 lg:mt-0 lg:p-6">
+                          <div className="flex flex-wrap items-end gap-2">
                             <div className="flex items-baseline text-brand-600">
                               <span className="text-sm font-bold">¥</span>
-                              <span className="bg-gradient-to-r from-brand-600 to-orange-500 bg-clip-text text-3xl font-black tracking-tight text-transparent">
+                              <span className="bg-gradient-to-r from-brand-600 to-orange-500 bg-clip-text text-4xl font-black tracking-tight text-transparent tabular-nums">
                                 {fmtPrice(d.goods.payPrice)}
                               </span>
                             </div>
-                            <span className="pb-1 text-xs text-zinc-400 line-through">
+                            <span className="pb-1.5 text-xs text-zinc-400 line-through tabular-nums">
                               ¥{fmtPrice(d.goods.originalPrice)}
                             </span>
-                            <span className="mb-1 ml-auto rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-2.5 py-1 text-[10px] font-bold text-white shadow shadow-brand-500/30">
-                              Group-buy deal
+                            <span className="pill-button mb-1 ml-auto bg-gradient-to-r from-brand-500 to-orange-400 px-2.5 py-1 text-[10px] text-white shadow-brand">
+                              {unsafeHTML(icon(ICONS.bolt, "h-3 w-3"))}
+                              Group price
                             </span>
                           </div>
-                          <p className="mt-2 text-xs font-medium text-brand-600">
-                            Direct deduction ¥{fmtPrice(d.goods.deductionPrice)}
+                          <p className="mt-2 text-xs font-semibold text-brand-600">
+                            Save ¥{fmtPrice(d.goods.deductionPrice)}
                           </p>
                           {this.renderDiscount(d)}
-                          <h1 className="mt-2 text-[15px] font-bold leading-snug text-zinc-900">
+                          <h1 className="mt-3 text-[15px] font-bold leading-snug text-zinc-900">
                             {PRODUCT_TITLES[this.goodsId] ??
                               `Demo goods ${this.goodsId}`}
                           </h1>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">
-                              Genuine goods guarantee
-                            </span>
-                            <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">
-                              Instant refunds
-                            </span>
-                            <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">
-                              Auto team completion
-                            </span>
-                          </div>
-
-                          {/* Desktop purchase actions (mobile uses the fixed bottom bar) */}
-                          <div className="mt-5 hidden gap-3 lg:flex">
-                            <button
-                              onClick={() => this.buyAlone()}
-                              disabled={this.locking}
-                              className="flex-1 rounded-2xl border-2 border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-600 transition hover:border-brand-200 active:scale-[.98] disabled:opacity-60"
-                            >
-                              Buy solo
-                              <span className="ml-1 text-xs font-medium text-zinc-400">
-                                ¥{fmtPrice(d.goods.originalPrice)}
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => void this.startOrJoin()}
-                              disabled={this.locking}
-                              className="flex-1 rounded-2xl bg-gradient-to-r from-brand-500 to-orange-400 py-3 text-sm font-black text-white shadow-lg shadow-brand-500/35 transition active:scale-[.98] disabled:opacity-60"
-                            >
-                              Start a team
-                              <span className="ml-1 text-xs font-semibold text-white/85">
-                                ¥{fmtPrice(d.goods.payPrice)}
-                              </span>
-                            </button>
-                          </div>
+                          {this.renderBuyButtons(d, "mt-5 hidden lg:flex")}
                         </section>
 
-                        {/* Team statistics row */}
                         {stat && (
                           <section className="mt-4 grid grid-cols-3 gap-2.5 lg:mt-5">
                             {this.renderStat(
                               ICONS.users,
-                              "Teams created",
+                              "Teams",
                               stat.allTeamCount,
                             )}
                             {this.renderStat(
                               ICONS.check,
-                              "Teams completed",
+                              "Completed",
                               stat.allTeamCompleteCount,
                             )}
                             {this.renderStat(
                               ICONS.bolt,
-                              "Participants",
+                              "Members",
                               stat.allTeamUserCount,
                             )}
                           </section>
                         )}
 
-                        {/* Pending (unpaid) order resume bar — survives page refreshes */}
                         {this.pendingOutTradeNo && !this.payOpen && (
                           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-brand-200/70 bg-gradient-to-r from-brand-50 to-orange-50 px-4 py-3 shadow-sm lg:mt-5">
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-brand-700">
-                                You have an unpaid group-buy order
-                              </p>
-                              <p className="mt-0.5 truncate font-mono text-[10px] text-brand-400">
-                                {this.pendingOutTradeNo}
-                              </p>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-brand-500 shadow-sm">
+                                {unsafeHTML(icon(ICONS.wallet, "h-4 w-4"))}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-brand-700">
+                                  Unpaid order
+                                </p>
+                                <p className="mt-0.5 truncate font-mono text-[10px] text-brand-400">
+                                  {this.pendingOutTradeNo}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                               <button
                                 onClick={() => void this.cancelPending()}
-                                className="rounded-full px-2 py-1 text-[11px] text-zinc-400 transition hover:text-zinc-600"
+                                className="pressable rounded-full px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-600"
                               >
                                 Cancel
                               </button>
@@ -619,68 +564,65 @@ export class HomePage extends UiElement {
                                     this.pendingOutTradeNo,
                                   )
                                 }
-                                className="rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-1.5 text-xs font-bold text-white shadow shadow-brand-500/30 transition active:scale-95"
+                                className="pressable rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-1.5 text-xs font-bold text-white shadow-brand"
                               >
-                                Resume payment
+                                Pay now
                               </button>
                             </div>
                           </div>
                         )}
 
-                        {/* Paid seat (joiner) — refund stays reachable even when I do not lead a team */}
                         {this.settledOutTradeNo && !this.ownTeam && (
                           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 px-4 py-3 shadow-sm lg:mt-5">
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-emerald-700">
-                                You have a paid seat in this campaign
-                              </p>
-                              <p className="mt-0.5 truncate font-mono text-[10px] text-emerald-500">
-                                {this.settledOutTradeNo}
-                              </p>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-emerald-600 shadow-sm">
+                                {unsafeHTML(icon(ICONS.check, "h-4 w-4"))}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-emerald-700">
+                                  Paid seat
+                                </p>
+                                <p className="mt-0.5 truncate font-mono text-[10px] text-emerald-500">
+                                  {this.settledOutTradeNo}
+                                </p>
+                              </div>
                             </div>
                             <button
                               onClick={() =>
                                 void this.refundOrder(this.settledOutTradeNo)
                               }
-                              className="shrink-0 rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
+                              className="pressable shrink-0 rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-100"
                             >
                               Refund
                             </button>
                           </div>
                         )}
 
-                        {/* Team list */}
                         <section className="mt-5 lg:mt-6">
                           <div className="mb-2.5 flex items-center justify-between px-1">
                             <h2 className="text-sm font-black text-zinc-900">
                               Active teams
-                              <span className="ml-1.5 text-xs font-medium text-zinc-400">
-                                Join one directly
+                              <span className="ml-2 rounded-full bg-zinc-200/70 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-zinc-500">
+                                {teams.length}
                               </span>
                             </h2>
                             <button
                               onClick={() => void this.load(true)}
                               disabled={this.inFlight}
-                              className="flex items-center gap-1 text-xs text-zinc-400 transition hover:text-brand-600 disabled:opacity-50"
+                              aria-label="Refresh teams"
+                              className="pressable grid h-8 w-8 place-items-center rounded-full text-zinc-400 hover:bg-white hover:text-brand-600 disabled:opacity-50"
                             >
-                              {unsafeHTML(
-                                svgIcon(ICONS.refresh, "h-3.5 w-3.5"),
-                              )}
-                              Refresh
+                              {unsafeHTML(icon(ICONS.refresh, "h-4 w-4"))}
                             </button>
                           </div>
 
                           {teams.length === 0 ? (
-                            <div className="rounded-3xl border-2 border-dashed border-zinc-200 bg-white/60 px-6 py-10 text-center">
-                              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-100 to-orange-100 text-brand-500">
-                                {unsafeHTML(svgIcon(ICONS.sparkles, "h-6 w-6"))}
+                            <div className="surface flex flex-col items-center border-2 border-dashed border-zinc-200 bg-white/60 px-6 py-10 text-center shadow-none">
+                              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-100 to-orange-100 text-brand-500">
+                                {unsafeHTML(icon(ICONS.sparkles, "h-6 w-6"))}
                               </div>
                               <p className="mt-3 text-sm font-semibold text-zinc-600">
-                                No active teams right now — start the first one!
-                              </p>
-                              <p className="mt-1 text-xs text-zinc-400">
-                                Lock in the group price and let your team fill
-                                up.
+                                No active teams yet
                               </p>
                             </div>
                           ) : (
@@ -694,86 +636,64 @@ export class HomePage extends UiElement {
                   )}
           </main>
 
-          {/* Mobile bottom action bar */}
           {!this.loading && d && (
-            <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md border-t border-zinc-200/60 bg-white/90 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-3 backdrop-blur lg:hidden">
-              <div className="mx-auto flex w-full gap-3">
-                <button
-                  onClick={() => this.buyAlone()}
-                  disabled={this.locking}
-                  className="flex-1 rounded-2xl border-2 border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-600 transition active:scale-[.98] disabled:opacity-60"
-                >
-                  Buy solo
-                  <span className="ml-1 text-xs font-medium text-zinc-400">
-                    ¥{fmtPrice(d.goods.originalPrice)}
-                  </span>
-                </button>
-                <button
-                  onClick={() => void this.startOrJoin()}
-                  disabled={this.locking}
-                  className="flex-1 rounded-2xl bg-gradient-to-r from-brand-500 to-orange-400 py-3 text-sm font-black text-white shadow-lg shadow-brand-500/35 transition active:scale-[.98] disabled:opacity-60"
-                >
-                  Start a team
-                  <span className="ml-1 text-xs font-semibold text-white/85">
-                    ¥{fmtPrice(d.goods.payPrice)}
-                  </span>
-                </button>
-              </div>
+            <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md border-t border-zinc-200/70 bg-white/90 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-3 backdrop-blur-xl lg:hidden">
+              {this.renderBuyButtons(d)}
             </div>
           )}
 
-          {/* Payment modal */}
           {this.payOpen && (
             <div
               ref={this.overlayRef}
               onClick={() => this.closePay()}
-              className="fixed inset-0 z-40 bg-zinc-950/45 backdrop-blur-sm"
+              className="fixed inset-0 z-40 bg-zinc-950/50 backdrop-blur-sm"
             >
               <div className="absolute inset-0 mx-auto flex w-full max-w-md items-end px-4 pb-6 lg:items-center lg:justify-center lg:pb-0">
                 <div
                   ref={this.panelRef}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full rounded-3xl bg-white p-6 shadow-2xl"
+                  className="w-full rounded-[1.75rem] bg-white p-6 shadow-2xl"
                 >
                   <div className="mx-auto h-1 w-10 rounded-full bg-zinc-200 lg:hidden" />
-                  <h3 className="mt-3 text-center text-base font-black text-zinc-900 lg:mt-0">
-                    Complete payment
-                  </h3>
-                  <p className="mt-1 text-center text-[11px] text-zinc-400">
-                    Simulated QR — no real charge is made
-                  </p>
-                  <div className="mt-2 text-center">
-                    <span className="text-sm font-bold text-brand-600">¥</span>
-                    <span className="text-3xl font-black text-brand-600">
-                      {this.payAmount}
+                  <div className="mt-4 flex flex-col items-center lg:mt-0">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                      {unsafeHTML(icon(ICONS.qr, "h-5 w-5"))}
                     </span>
+                    <h3 className="mt-2 text-base font-black text-zinc-900">
+                      Payment
+                    </h3>
+                    <div className="mt-1 flex items-baseline text-brand-600">
+                      <span className="text-sm font-bold">¥</span>
+                      <span className="text-3xl font-black tabular-nums">
+                        {this.payAmount}
+                      </span>
+                    </div>
                   </div>
-                  {/* Simulated payment QR: canvas-generated from the trade number; not an image file. */}
-                  <img
-                    src={genQrArt(
-                      this.paySolo
-                        ? `solo-${this.goodsId}-${this.me}`
-                        : this.payOutTradeNo || "be261028-pay",
-                    )}
-                    alt="Simulated payment QR code"
-                    className="mx-auto mt-4 h-44 w-44 rounded-2xl border border-zinc-100 object-contain"
-                  />
-                  <p className="mt-3 text-center font-mono text-[11px] text-zinc-400">
-                    {this.paySolo
-                      ? "Solo purchase · no group order"
-                      : `Trade no. ${this.payOutTradeNo}`}
+                  <div className="mx-auto mt-4 w-fit rounded-2xl bg-gradient-to-br from-brand-100 to-orange-100 p-1 shadow-sm">
+                    <img
+                      src={genQrArt(
+                        this.paySolo
+                          ? `solo-${this.goodsId}-${this.me}`
+                          : this.payOutTradeNo || "be261028-pay",
+                      )}
+                      alt=""
+                      className="h-44 w-44 rounded-xl border border-white bg-white object-contain"
+                    />
+                  </div>
+                  <p className="mt-3 truncate text-center font-mono text-[11px] text-zinc-400">
+                    {this.paySolo ? "Solo purchase" : this.payOutTradeNo}
                   </p>
                   <div className="mt-5 flex gap-3">
                     <button
                       onClick={() => this.closePay()}
-                      className="flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm font-medium text-zinc-500 transition active:scale-[.98]"
+                      className="pressable flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => void this.confirmPay()}
                       disabled={this.paying}
-                      className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-orange-400 py-2.5 text-sm font-black text-white shadow-lg shadow-brand-500/30 transition active:scale-[.98] disabled:opacity-60"
+                      className="pressable flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-orange-400 py-2.5 text-sm font-black text-white shadow-brand disabled:opacity-60"
                     >
                       {this.paying ? "Processing…" : "Confirm payment"}
                     </button>
@@ -787,11 +707,11 @@ export class HomePage extends UiElement {
     );
   }
 
-  private renderStat(icon: string, label: string, value: number) {
+  private renderStat(glyph: string, label: string, value: number) {
     return (
-      <div className="rounded-2xl bg-white px-2 py-3 text-center shadow-sm">
+      <div className="surface px-2 py-3 text-center">
         <div className="mx-auto grid h-7 w-7 place-items-center rounded-full bg-brand-50 text-brand-600">
-          {unsafeHTML(svgIcon(icon, "h-3.5 w-3.5"))}
+          {unsafeHTML(icon(glyph, "h-3.5 w-3.5"))}
         </div>
         <div className="mt-1.5 text-lg font-black tabular-nums text-zinc-900">
           {value}
@@ -808,30 +728,24 @@ export class HomePage extends UiElement {
       Math.round((t.completeCount / Math.max(1, t.targetCount)) * 100),
     );
     const mine = t.userId === this.me;
-    // Owner entries carry outTradeNo (the refund handle); random-sampled
-    // entries of other users omit it. The locally persisted settled trade
-    // number is the fallback for teams that already completed and left the
-    // in-progress list (e.g. the target-1 demo campaign).
     const refundNo = mine ? t.outTradeNo || this.settledOutTradeNo : "";
     return (
-      <div className="team-card flex items-center justify-between gap-3 rounded-2xl bg-white p-3.5 shadow-sm">
+      <div className="team-card surface flex items-center justify-between gap-3 p-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          {/* Avatar: deterministic canvas identicon, never an image file. */}
           <img
             src={genAvatarArt(t.userId)}
-            alt={`Avatar of ${t.userId}`}
-            className="h-10 w-10 shrink-0 rounded-full shadow ring-2 ring-white"
+            alt=""
+            className="h-10 w-10 shrink-0 rounded-full shadow-sm ring-2 ring-white"
           />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-bold text-zinc-800">
               <span className="truncate">{t.userId}</span>
               {mine && (
                 <span className="shrink-0 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">
-                  My team
+                  You
                 </span>
               )}
             </div>
-            {/* Team progress: completeCount (paid seats) / targetCount */}
             <div className="mt-1 flex items-center gap-2">
               <span className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-100">
                 <span
@@ -847,11 +761,9 @@ export class HomePage extends UiElement {
               <span
                 className={remaining <= 1 ? "font-semibold text-brand-500" : ""}
               >
-                {remaining === 1
-                  ? "Only 1 seat left"
-                  : `Only ${remaining} seats left`}
+                {remaining} seat{remaining === 1 ? "" : "s"} left
               </span>
-              <span className="text-zinc-200">|</span>
+              <span className="text-zinc-200">·</span>
               <CountDown
                 endTime={t.validEndTime}
                 initial={t.validTimeCountdown}
@@ -863,7 +775,7 @@ export class HomePage extends UiElement {
           {refundNo && (
             <button
               onClick={() => void this.refundOrder(refundNo)}
-              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-brand-200 hover:text-brand-600"
+              className="pressable rounded-full border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-brand-200 hover:text-brand-600"
             >
               Refund
             </button>
@@ -871,16 +783,15 @@ export class HomePage extends UiElement {
           <button
             onClick={() => void this.startOrJoin(t.teamId)}
             disabled={this.locking}
-            className="rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-1.5 text-xs font-bold text-white shadow shadow-brand-500/30 transition active:scale-95 disabled:opacity-60"
+            className="pressable rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-1.5 text-xs font-bold text-white shadow-brand disabled:opacity-60"
           >
-            Join team
+            Join
           </button>
         </div>
       </div>
     );
   }
 
-  /** Discount info: render the VO when the backend sends one; otherwise derive an equivalent expression from the trial prices. */
   private renderDiscount(d: MarketConfig) {
     const disc = d.groupBuyActivityDiscountVO?.groupBuyDiscount;
     if (disc && (disc.discountName || disc.discountDesc || disc.marketExpr)) {
@@ -927,9 +838,9 @@ export class HomePage extends UiElement {
   private renderSkeleton() {
     return (
       <div className="flex animate-pulse flex-col gap-4 lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-8">
-        <div className="aspect-square w-full rounded-3xl bg-zinc-200 lg:col-span-5 xl:col-span-4" />
+        <div className="aspect-square w-full rounded-card bg-zinc-200 lg:col-span-5 xl:col-span-4" />
         <div className="flex flex-col gap-4 lg:col-span-7 xl:col-span-8">
-          <div className="h-40 rounded-3xl bg-zinc-200" />
+          <div className="h-40 rounded-card bg-zinc-200" />
           <div className="h-16 rounded-2xl bg-zinc-200" />
           <div className="h-16 rounded-2xl bg-zinc-200" />
         </div>
@@ -941,14 +852,14 @@ export class HomePage extends UiElement {
     return (
       <div className="mt-16 flex flex-col items-center px-6 text-center lg:col-span-12">
         <div className="grid h-14 w-14 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
-          {unsafeHTML(svgIcon(ICONS.alert, "h-7 w-7"))}
+          {unsafeHTML(icon(ICONS.alert, "h-7 w-7"))}
         </div>
         <p className="mt-4 text-sm font-semibold text-zinc-600">
           {this.errorMsg}
         </p>
         <button
           onClick={() => void this.load(false)}
-          className="mt-5 rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-500/30 transition active:scale-95"
+          className="pressable pill-button mt-5 bg-gradient-to-r from-brand-500 to-orange-400 px-6 py-2.5 text-sm text-white shadow-brand"
         >
           Reload
         </button>

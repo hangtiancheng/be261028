@@ -1,5 +1,5 @@
 import { customElement, property, state } from "@yukino.js/lit-jsx";
-import type { PropertyValues } from "lit";
+import type { PropertyValues } from "@yukino.js/lit-jsx";
 import { animate } from "motion";
 import {
   fromSeconds,
@@ -66,14 +66,18 @@ export class CountDown extends UiElement {
   render() {
     if (this.cd.ended) {
       return (
-        <span className="text-[11px] font-medium text-zinc-300">Ended</span>
+        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-400">
+          Ended
+        </span>
       );
     }
     const urgent = this.cd.total < 60;
     return (
       <span
-        className={`font-mono text-[11px] font-semibold tabular-nums ${
-          urgent ? "animate-pulse text-brand-600" : "text-zinc-400"
+        className={`rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums ${
+          urgent
+            ? "animate-pulse bg-brand-50 text-brand-600"
+            : "bg-zinc-100 text-zinc-500"
         }`}
       >
         {fmtCountdown(this.cd)}

@@ -1,4 +1,4 @@
-/** Login state: front-end-only cookie (username, 1-day expiry) for parity with the legacy app; no real authentication. */
+/** Login state: username stored in a 1-day cookie. */
 
 export function getUsername(): string | null {
   const match = document.cookie

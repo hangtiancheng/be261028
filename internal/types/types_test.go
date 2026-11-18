@@ -16,7 +16,7 @@ func TestJavaStringHashCode(t *testing.T) {
 		"abc":         96354,
 		"Aa":          2112, // classic Java hash collision with "BB"
 		"BB":          2112,
-		"xfg01":       113961722,
+		"yukino01":    113961722,
 		"hello world": 1794106052,
 		// Overflow case: exercises 32-bit wraparound to Integer.MIN_VALUE.
 		"polygenelubricants": -2147483648,
@@ -38,12 +38,12 @@ func TestJavaAbs(t *testing.T) {
 }
 
 func TestIndexFromUserId(t *testing.T) {
-	idx := IndexFromUserId("xfg01")
+	idx := IndexFromUserId("yukino01")
 	if idx < 0 || idx > 2147483646 {
 		t.Errorf("IndexFromUserId out of range: %d", idx)
 	}
 	// Deterministic.
-	if idx != IndexFromUserId("xfg01") {
+	if idx != IndexFromUserId("yukino01") {
 		t.Errorf("IndexFromUserId not deterministic")
 	}
 }

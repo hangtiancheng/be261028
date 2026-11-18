@@ -5,7 +5,7 @@ import "testing"
 // TestIsCutRangeBoundaries pins the defect fix: the legacy <= comparison let
 // cutRange=0 admit bucket-0 users and made every setting off by one percent.
 func TestIsCutRangeBoundaries(t *testing.T) {
-	users := []string{"u1", "xiaofuge", "liergou", "xfg01", "user-42", "test", "xifeiya"}
+	users := []string{"u1", "yukino", "u2", "yukino01", "u3", "test", "u4"}
 
 	// cutRange=0 must reject every user.
 	d := New("", map[string]string{KeyCutRange: "0"})

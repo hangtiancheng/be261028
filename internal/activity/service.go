@@ -234,7 +234,7 @@ func (s *TagService) ExecTagBatchJob(ctx context.Context, tagId, batchId string)
 	if _, err := s.repo.QueryCrowdTagsJobEntity(ctx, tagId, batchId); err != nil {
 		return err
 	}
-	userIds := []string{"xifeiya", "gaofei", "xifeiya01", "xifeiya02", "xifeiya03"}
+	userIds := []string{"u4", "gaofei", "u401", "u402", "u403"}
 	for _, uid := range userIds {
 		if err := s.repo.AddCrowdTagsUserId(ctx, tagId, uid); err != nil {
 			return err

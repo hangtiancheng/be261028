@@ -1,7 +1,8 @@
 import { customElement, state } from "@yukino.js/lit-jsx";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { animate } from "motion";
-import { ICONS, svgIcon } from "../lib/icons";
+import { ICONS } from "../lib/icons";
+import { icon } from "@yukino.js/lit-jsx/community";
 import { subscribeToasts, type ToastItem } from "../lib/toast";
 import { UiElement } from "./base";
 
@@ -12,9 +13,9 @@ const KIND_ICON: Record<string, string> = {
 };
 
 const KIND_STYLE: Record<string, string> = {
-  success: "border-emerald-200/70 bg-emerald-50/95 text-emerald-700",
-  error: "border-rose-200/70 bg-rose-50/95 text-rose-600",
-  info: "border-zinc-200/70 bg-white/95 text-zinc-600",
+  success: "border-emerald-200/80 bg-emerald-50/95 text-emerald-700",
+  error: "border-rose-200/80 bg-rose-50/95 text-rose-600",
+  info: "border-zinc-200/80 bg-white/95 text-zinc-700",
 };
 
 /** Global toast host: subscribes to the lib/toast store; motion drives the enter/leave transitions. */
@@ -79,11 +80,12 @@ export class ToastHost extends UiElement {
       <div className="pointer-events-none fixed inset-x-0 top-16 z-[100] flex flex-col items-center gap-2 px-4">
         {this.items.map((t) => (
           <div
+            key={String(t.id)}
             data-toast-id={String(t.id)}
-            className={`pointer-events-auto flex max-w-sm items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg shadow-zinc-900/5 backdrop-blur ${KIND_STYLE[t.kind]}`}
+            className={`pointer-events-auto flex max-w-sm items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium shadow-raised backdrop-blur ${KIND_STYLE[t.kind]}`}
           >
             {unsafeHTML(
-              svgIcon(KIND_ICON[t.kind], "h-4 w-4 shrink-0 [stroke-width:2.4]"),
+              icon(KIND_ICON[t.kind], "h-4 w-4 shrink-0 [stroke-width:2.4]"),
             )}
             <span>{t.message}</span>
           </div>

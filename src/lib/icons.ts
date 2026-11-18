@@ -1,9 +1,4 @@
-/**
- * Inline SVG icon set.
- * Image files are forbidden across the whole app, so every glyph is an inline
- * SVG string rendered through Lit's unsafeHTML directive — the same approach
- * the @yukino.js/lit-jsx community icon helpers use (string in, directive out).
- */
+/** Inline SVG icon set, rendered with `icon()` from @yukino.js/lit-jsx/community. */
 
 const STROKE =
   'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
@@ -30,8 +25,3 @@ export const ICONS = {
   wallet: `<svg ${STROKE}><path d="M20 7H4a2 2 0 0 1 0-4h14v4"/><path d="M4 7v12a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><path d="M16.5 13.5h.01"/></svg>`,
   logout: `<svg ${STROKE}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>`,
 } as const;
-
-/** Injects a class attribute into the leading <svg> tag of an icon string. */
-export function svgIcon(svg: string, className: string): string {
-  return svg.replace("<svg ", `<svg class="${className}" `);
-}

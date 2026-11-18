@@ -2,8 +2,9 @@ import { customElement, state } from "@yukino.js/lit-jsx";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { animate, stagger } from "motion";
 import { api, type ActivityUpsertBody, type AdminActivity } from "../lib/api";
-import { ICONS, svgIcon } from "../lib/icons";
-import { navigate } from "../lib/router";
+import { ICONS } from "../lib/icons";
+import { icon } from "@yukino.js/lit-jsx/community";
+import { navigate } from "@yukino.js/lit-jsx/community";
 import { toast } from "../lib/toast";
 import {
   backendToDatetimeLocal,
@@ -27,14 +28,12 @@ interface ActivityForm {
   status: string;
   startTime: string;
   endTime: string;
-  // Discount (submitted on create only)
   discountName: string;
   discountDesc: string;
   discountType: string;
   marketPlan: string;
   marketExpr: string;
   tagId: string;
-  // SKU (submitted on create only)
   goodsId: string;
   goodsName: string;
   skuSource: string;
@@ -79,13 +78,12 @@ const GROUP_TYPE_LABELS: Record<number, string> = {
 };
 
 const EXPR_HINTS: Record<string, string> = {
-  ZJ: "Deduction amount, e.g. 20 (¥20 off)",
-  MJ: "Threshold,amount — e.g. 100,20 (¥20 off orders over ¥100)",
-  N: "Final price, e.g. 80 (buy at ¥80)",
-  ZK: "Discount rate, e.g. 0.8 (pay 80%)",
+  ZJ: "e.g. 20",
+  MJ: "e.g. 100,20",
+  N: "e.g. 80",
+  ZK: "e.g. 0.8",
 };
 
-/** Admin console: activity management (list / create / edit / enable / disable / delete) + DCC dynamic-config panel. */
 @customElement("x-admin-page")
 export class AdminPage extends UiElement {
   @state() private tab: Tab = "activity";
@@ -102,7 +100,6 @@ export class AdminPage extends UiElement {
   private listAnimated = false;
   private animatedPanels = new WeakSet<Element>();
 
-  // DCC has no read endpoint; these are the documented defaults, saving overwrites.
   @state() private dcc: Record<DccKey, string> = {
     downgradeSwitch: "0",
     cacheSwitch: "0",
@@ -117,10 +114,7 @@ export class AdminPage extends UiElement {
       animate(
         this,
         { opacity: [0, 1], transform: ["translateY(10px)", "translateY(0)"] },
-        {
-          duration: 0.4,
-          ease: [0.22, 1, 0.36, 1],
-        },
+        { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
       );
     });
   }
@@ -141,7 +135,6 @@ export class AdminPage extends UiElement {
     this.loading = false;
   }
 
-  /** Activity details: GET /api/v1/admin/activity/detail/:id */
   private async loadDetail(id: number): Promise<void> {
     try {
       const res = await api.adminDetail(id);
@@ -156,7 +149,6 @@ export class AdminPage extends UiElement {
   }
 
   protected override updated(): void {
-    // List entrance (staggered) for both the mobile cards and the desktop rows.
     if (!this.listAnimated && !this.loading && this.activities.length) {
       this.listAnimated = true;
       const cards = this.querySelectorAll<HTMLElement>(
@@ -170,7 +162,6 @@ export class AdminPage extends UiElement {
         );
       }
     }
-    // Modal panel entrance (each freshly rendered panel animates once).
     this.querySelectorAll<HTMLElement>("[data-modal-panel]").forEach((el) => {
       if (this.animatedPanels.has(el)) return;
       this.animatedPanels.add(el);
@@ -261,9 +252,6 @@ export class AdminPage extends UiElement {
     };
 
     if (!this.editing) {
-      // On create, the discount and SKU sections are submitted as well. Editing
-      // only touches the activity fields: the backend updates rows by
-      // existence, so omitting them avoids accidental changes to shared data.
       const originalPrice = num(f.originalPrice, "Goods price");
       if (originalPrice === null) return;
       if (originalPrice <= 0)
@@ -331,7 +319,6 @@ export class AdminPage extends UiElement {
     }
   }
 
-  /** First click arms the delete button; the armed state expires after 3 s. */
   private requestDelete(a: AdminActivity): void {
     this.confirmDeleteId = a.activityId;
     window.setTimeout(() => {
@@ -375,7 +362,7 @@ export class AdminPage extends UiElement {
     try {
       const res = await api.dccUpdate(key, value);
       if (res.code === "0000") {
-        toast.success(`Configuration "${key}" updated to "${value}"`);
+        toast.success(`${key} → ${value}`);
       } else {
         toast.error(res.info || "Failed to update the configuration");
       }
@@ -387,27 +374,26 @@ export class AdminPage extends UiElement {
 
   render() {
     return (
-      <div className="min-h-dvh bg-zinc-100">
-        <div className="mx-auto min-h-dvh w-full max-w-3xl bg-zinc-50 px-4 pb-16 shadow-2xl shadow-zinc-900/10 sm:px-6 lg:max-w-6xl lg:px-8 xl:max-w-7xl">
-          {/* Top bar */}
-          <header className="sticky top-0 z-20 -mx-4 border-b border-zinc-200/60 bg-zinc-50/85 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="app-shell min-h-dvh">
+        <div className="mx-auto min-h-dvh w-full max-w-3xl bg-zinc-50/95 px-4 pb-16 shadow-2xl shadow-zinc-900/10 ring-1 ring-zinc-900/5 sm:px-6 lg:max-w-6xl lg:px-8 xl:max-w-7xl">
+          <header className="sticky top-0 z-20 -mx-4 border-b border-zinc-200/70 bg-zinc-50/85 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate("/")}
                 aria-label="Back to the storefront"
-                className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:border-brand-300 hover:text-brand-600"
+                className="pressable grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:border-brand-300 hover:text-brand-600"
               >
-                {unsafeHTML(svgIcon(ICONS.arrowLeft, "h-4 w-4"))}
+                {unsafeHTML(icon(ICONS.arrowLeft, "h-4 w-4"))}
               </button>
-              <div>
-                <h1 className="text-base font-black text-zinc-900">
+              <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-orange-400 text-white shadow-brand">
+                  {unsafeHTML(icon(ICONS.sliders, "h-4 w-4"))}
+                </span>
+                <h1 className="text-base font-black tracking-tight text-zinc-900">
                   Admin console
                 </h1>
-                <p className="text-[11px] text-zinc-400">
-                  be261028 · Activities & dynamic configuration
-                </p>
               </div>
-              <div className="ml-auto flex rounded-full border border-zinc-200 bg-white p-0.5">
+              <div className="ml-auto flex rounded-full border border-zinc-200 bg-white p-0.5 shadow-sm">
                 {(
                   [
                     ["activity", "Activities"],
@@ -415,12 +401,13 @@ export class AdminPage extends UiElement {
                   ] as [Tab, string][]
                 ).map(([key, label]) => (
                   <button
+                    key={key}
                     onClick={() => {
                       this.tab = key;
                     }}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    className={`pill-button px-3.5 py-1.5 text-xs ${
                       this.tab === key
-                        ? "bg-gradient-to-r from-brand-500 to-orange-400 text-white shadow"
+                        ? "bg-gradient-to-r from-brand-500 to-orange-400 text-white shadow-sm"
                         : "text-zinc-500 hover:text-zinc-800"
                     }`}
                   >
@@ -458,18 +445,18 @@ export class AdminPage extends UiElement {
     ];
     return (
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/45 backdrop-blur-sm lg:items-center lg:p-6"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/50 backdrop-blur-sm lg:items-center lg:p-6"
         onClick={() => {
           this.detail = null;
         }}
       >
         <div
           data-modal-panel
-          className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl lg:rounded-3xl lg:p-7"
+          className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] bg-white p-5 shadow-2xl lg:rounded-[1.75rem] lg:p-7"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mx-auto h-1 w-10 rounded-full bg-zinc-200 lg:hidden" />
-          <div className="mt-3 flex items-center gap-2 lg:mt-0">
+          <div className="mt-4 flex items-center gap-2 lg:mt-0">
             <h3 className="truncate text-base font-black text-zinc-900">
               Activity details
             </h3>
@@ -482,15 +469,18 @@ export class AdminPage extends UiElement {
               onClick={() => {
                 this.detail = null;
               }}
-              className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+              className="pressable ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
               aria-label="Close"
             >
-              {unsafeHTML(svgIcon(ICONS.close, "h-4 w-4"))}
+              {unsafeHTML(icon(ICONS.close, "h-4 w-4"))}
             </button>
           </div>
-          <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-0 sm:grid-cols-2">
+          <dl className="mt-4 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
             {rows.map(([label, value]) => (
-              <div className="flex items-baseline justify-between gap-3 border-b border-zinc-100 py-2.5">
+              <div
+                key={label}
+                className="flex items-baseline justify-between gap-3 border-b border-zinc-100 py-2.5"
+              >
                 <dt className="shrink-0 text-xs text-zinc-400">{label}</dt>
                 <dd className="truncate text-right text-xs font-semibold text-zinc-700">
                   {value}
@@ -507,7 +497,7 @@ export class AdminPage extends UiElement {
             onClick={() => {
               this.detail = null;
             }}
-            className="mt-5 w-full rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-500 transition active:scale-[.98]"
+            className="pressable mt-5 w-full rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
           >
             Close
           </button>
@@ -520,44 +510,40 @@ export class AdminPage extends UiElement {
     return (
       <main className="mt-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs font-semibold tabular-nums text-zinc-400">
             {this.activities.length}{" "}
             {this.activities.length === 1 ? "activity" : "activities"}
           </p>
           <button
             onClick={() => this.openCreate()}
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-brand-500/30 transition active:scale-95"
+            className="pill-button bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-2 text-xs text-white shadow-brand"
           >
-            {unsafeHTML(svgIcon(ICONS.plus, "h-3.5 w-3.5 [stroke-width:2.6]"))}
+            {unsafeHTML(icon(ICONS.plus, "h-3.5 w-3.5 [stroke-width:2.6]"))}
             Create activity
           </button>
         </div>
 
         {this.loading ? (
           <div className="flex animate-pulse flex-col gap-3">
-            <div className="h-40 rounded-3xl bg-zinc-200" />
-            <div className="h-40 rounded-3xl bg-zinc-200" />
+            <div className="h-40 rounded-card bg-zinc-200" />
+            <div className="h-40 rounded-card bg-zinc-200" />
           </div>
         ) : this.activities.length === 0 ? (
-          <div className="rounded-3xl border-2 border-dashed border-zinc-200 bg-white/60 px-6 py-12 text-center">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
-              {unsafeHTML(svgIcon(ICONS.tag, "h-6 w-6"))}
+          <div className="surface flex flex-col items-center border-2 border-dashed border-zinc-200 bg-white/60 px-6 py-12 text-center shadow-none">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
+              {unsafeHTML(icon(ICONS.tag, "h-6 w-6"))}
             </div>
             <p className="mt-3 text-sm font-semibold text-zinc-600">
               No activities yet
             </p>
-            <p className="mt-1 text-xs text-zinc-400">
-              Create the first group-buy activity to get started.
-            </p>
           </div>
         ) : (
           <>
-            {/* Desktop: wide table with every activity field */}
-            <div className="hidden overflow-hidden rounded-3xl bg-white shadow-sm lg:block">
+            <div className="surface hidden overflow-hidden lg:block">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-left text-xs">
+                <table className="w-full min-w-[1040px] text-left text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-100 text-[10px] uppercase tracking-wider text-zinc-400">
+                    <tr className="border-b border-zinc-100 bg-zinc-50/60 text-[10px] uppercase tracking-wider text-zinc-400">
                       <th className="px-4 py-3 font-bold">ID</th>
                       <th className="px-4 py-3 font-bold">Activity</th>
                       <th className="px-4 py-3 font-bold">Discount</th>
@@ -579,7 +565,7 @@ export class AdminPage extends UiElement {
                       return (
                         <tr
                           key={String(a.activityId)}
-                          className="admin-row border-b border-zinc-50 align-middle transition last:border-0 hover:bg-zinc-50/70"
+                          className="admin-row border-b border-zinc-50 align-middle transition last:border-0 hover:bg-brand-50/40"
                         >
                           <td className="px-4 py-3 font-mono text-zinc-400">
                             #{a.activityId}
@@ -609,13 +595,13 @@ export class AdminPage extends UiElement {
                               {st.label}
                             </span>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-zinc-500">
+                          <td className="whitespace-nowrap px-4 py-3 text-[11px] tabular-nums text-zinc-500">
                             <div>{fmtDateTime(a.startTime)}</div>
                             <div className="text-zinc-300">
                               → {fmtDateTime(a.endTime)}
                             </div>
                           </td>
-                          <td className="px-4 py-3 tabular-nums text-zinc-400">
+                          <td className="whitespace-nowrap px-4 py-3 text-[11px] tabular-nums text-zinc-400">
                             {fmtDateTime(a.updateTime)}
                           </td>
                           <td className="px-4 py-3">
@@ -631,14 +617,13 @@ export class AdminPage extends UiElement {
               </div>
             </div>
 
-            {/* Mobile: stacked cards */}
             <div className="flex flex-col gap-3 lg:hidden">
               {this.activities.map((a) => {
                 const st = STATUS_META[a.status] ?? STATUS_META[0];
                 return (
                   <div
                     key={String(a.activityId)}
-                    className="admin-card rounded-3xl bg-white p-4 shadow-sm"
+                    className="admin-card surface p-4"
                   >
                     <div className="flex items-center gap-2">
                       <h3 className="truncate text-sm font-black text-zinc-900">
@@ -694,7 +679,7 @@ export class AdminPage extends UiElement {
 
   private renderTableActions(a: AdminActivity) {
     const iconBtn =
-      "grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-500 transition hover:border-brand-300 hover:text-brand-600 active:scale-95";
+      "pressable grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-500 hover:border-brand-300 hover:text-brand-600";
     return (
       <>
         <button
@@ -703,11 +688,11 @@ export class AdminPage extends UiElement {
           aria-label={a.status === 1 ? "Disable activity" : "Enable activity"}
           className={
             a.status === 1
-              ? "grid h-8 w-8 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-600 transition hover:bg-amber-100 active:scale-95"
-              : "grid h-8 w-8 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
+              ? "pressable grid h-8 w-8 place-items-center rounded-full border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100"
+              : "pressable grid h-8 w-8 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
           }
         >
-          {unsafeHTML(svgIcon(ICONS.bolt, "h-3.5 w-3.5"))}
+          {unsafeHTML(icon(ICONS.bolt, "h-3.5 w-3.5"))}
         </button>
         <button
           onClick={() => void this.loadDetail(a.activityId)}
@@ -715,7 +700,7 @@ export class AdminPage extends UiElement {
           aria-label="View details"
           className={iconBtn}
         >
-          {unsafeHTML(svgIcon(ICONS.info, "h-3.5 w-3.5"))}
+          {unsafeHTML(icon(ICONS.info, "h-3.5 w-3.5"))}
         </button>
         <button
           onClick={() => this.openEdit(a)}
@@ -723,14 +708,14 @@ export class AdminPage extends UiElement {
           aria-label="Edit activity"
           className={iconBtn}
         >
-          {unsafeHTML(svgIcon(ICONS.pencil, "h-3.5 w-3.5"))}
+          {unsafeHTML(icon(ICONS.pencil, "h-3.5 w-3.5"))}
         </button>
         {this.confirmDeleteId === a.activityId ? (
           <button
             onClick={() => void this.doDelete(a.activityId)}
             title="Confirm delete?"
             aria-label="Confirm delete"
-            className="grid h-8 place-items-center gap-1 rounded-full bg-rose-500 px-3 text-[10px] font-bold text-white shadow shadow-rose-500/30 transition active:scale-95"
+            className="pill-button bg-rose-500 px-3 py-1.5 text-[10px] text-white shadow-md shadow-rose-500/30"
           >
             Confirm?
           </button>
@@ -739,9 +724,9 @@ export class AdminPage extends UiElement {
             onClick={() => this.requestDelete(a)}
             title="Delete"
             aria-label="Delete activity"
-            className="grid h-8 w-8 place-items-center rounded-full border border-rose-100 bg-rose-50/60 text-rose-400 transition hover:bg-rose-50 hover:text-rose-500 active:scale-95"
+            className="pressable grid h-8 w-8 place-items-center rounded-full border border-rose-100 bg-rose-50/60 text-rose-400 hover:bg-rose-50 hover:text-rose-500"
           >
-            {unsafeHTML(svgIcon(ICONS.trash, "h-3.5 w-3.5"))}
+            {unsafeHTML(icon(ICONS.trash, "h-3.5 w-3.5"))}
           </button>
         )}
       </>
@@ -750,12 +735,12 @@ export class AdminPage extends UiElement {
 
   private renderCardActions(a: AdminActivity) {
     const btn =
-      "rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:border-brand-300 hover:text-brand-600 active:scale-95";
+      "pressable rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:border-brand-300 hover:text-brand-600";
     return (
       <>
         <button
           onClick={() => void this.toggleStatus(a)}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
+          className={`pressable rounded-full px-3 py-1.5 text-xs font-semibold ${
             a.status === 1
               ? "border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100"
               : "border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
@@ -775,14 +760,14 @@ export class AdminPage extends UiElement {
         {this.confirmDeleteId === a.activityId ? (
           <button
             onClick={() => void this.doDelete(a.activityId)}
-            className="rounded-full bg-rose-500 px-3 py-1.5 text-xs font-bold text-white shadow shadow-rose-500/30 transition active:scale-95"
+            className="pill-button bg-rose-500 px-3 py-1.5 text-xs text-white shadow-md shadow-rose-500/30"
           >
             Confirm delete?
           </button>
         ) : (
           <button
             onClick={() => this.requestDelete(a)}
-            className="rounded-full border border-rose-100 bg-rose-50/60 px-3 py-1.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-50 hover:text-rose-500 active:scale-95"
+            className="pressable rounded-full border border-rose-100 bg-rose-50/60 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-50 hover:text-rose-500"
           >
             Delete
           </button>
@@ -796,46 +781,22 @@ export class AdminPage extends UiElement {
     const rows: {
       key: DccKey;
       title: string;
-      desc: string;
       quick?: string[];
       mono?: boolean;
     }[] = [
-      {
-        key: "downgradeSwitch",
-        title: "Downgrade switch",
-        desc: 'When set to "1", every group-buy pricing request is intercepted (E0003).',
-        quick: ["0", "1"],
-      },
-      {
-        key: "cacheSwitch",
-        title: "Cache switch",
-        desc: '"0" = cache enabled; "1" = bypass the cache and read straight from the database.',
-        quick: ["0", "1"],
-      },
+      { key: "downgradeSwitch", title: "Downgrade switch", quick: ["0", "1"] },
+      { key: "cacheSwitch", title: "Cache switch", quick: ["0", "1"] },
       {
         key: "cutRange",
         title: "Traffic cut range",
-        desc: "Percentage of users allowed through, based on the userId hash (0–100).",
         quick: ["0", "50", "100"],
       },
-      {
-        key: "scBlacklist",
-        title: "SC channel blacklist",
-        desc: "Blocked source+channel combinations, comma-separated, e.g. s02c02,s03c03.",
-        mono: true,
-      },
+      { key: "scBlacklist", title: "SC channel blacklist", mono: true },
     ];
     return (
       <main className="mt-4 flex flex-col gap-3">
-        <p className="text-[11px] leading-relaxed text-zinc-400">
-          Dynamic configuration is published over Redis pub/sub and applied live
-          by the activity and trade services. The backend exposes no read
-          endpoint — the values below are the documented defaults, and “Update”
-          overwrites the current value.
-        </p>
-
         {rows.map((r) => (
-          <div className="rounded-3xl bg-white p-4 shadow-sm lg:p-5">
+          <div key={r.key} className="surface p-4 lg:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-bold text-zinc-800">
@@ -844,19 +805,17 @@ export class AdminPage extends UiElement {
                     {r.key}
                   </span>
                 </h3>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
-                  {r.desc}
-                </p>
                 {r.quick && (
                   <div className="mt-2 flex gap-1.5">
                     {r.quick.map((v) => (
                       <button
+                        key={v}
                         onClick={() => {
                           this.dcc = { ...this.dcc, [r.key]: v };
                         }}
-                        className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold transition ${
+                        className={`pill-button px-2.5 py-0.5 font-mono text-[10px] ${
                           d[r.key] === v
-                            ? "bg-brand-500 text-white shadow shadow-brand-500/30"
+                            ? "bg-brand-500 text-white shadow-brand"
                             : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
                         }`}
                       >
@@ -877,16 +836,16 @@ export class AdminPage extends UiElement {
                     };
                   }}
                   aria-label={`${r.key} value`}
-                  className={`w-40 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-white ${
+                  className={`w-40 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100 ${
                     r.mono ? "font-mono" : ""
                   }`}
                 />
                 <button
                   onClick={() => void this.setDcc(r.key)}
                   disabled={this.dccSaving === r.key}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-2 text-xs font-bold text-white shadow shadow-brand-500/30 transition active:scale-95 disabled:opacity-60"
+                  className="pill-button bg-gradient-to-r from-brand-500 to-orange-400 px-4 py-2 text-xs text-white shadow-brand disabled:opacity-60"
                 >
-                  {unsafeHTML(svgIcon(ICONS.refresh, "h-3.5 w-3.5"))}
+                  {unsafeHTML(icon(ICONS.refresh, "h-3.5 w-3.5"))}
                   {this.dccSaving === r.key ? "Saving…" : "Update"}
                 </button>
               </div>
@@ -900,22 +859,22 @@ export class AdminPage extends UiElement {
   private renderFormModal() {
     const f = this.form;
     const inputCls =
-      "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-white";
+      "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100";
     const labelCls = "flex flex-col gap-1 text-xs font-semibold text-zinc-500";
     return (
       <div
-        className="fixed inset-0 z-40 flex items-end justify-center bg-zinc-950/45 backdrop-blur-sm lg:items-center lg:p-6"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-zinc-950/50 backdrop-blur-sm lg:items-center lg:p-6"
         onClick={() => {
           this.formOpen = false;
         }}
       >
         <div
           data-modal-panel
-          className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl lg:rounded-3xl lg:p-7 xl:max-w-2xl"
+          className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] bg-white p-5 shadow-2xl lg:rounded-[1.75rem] lg:p-7 xl:max-w-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mx-auto h-1 w-10 rounded-full bg-zinc-200 lg:hidden" />
-          <h3 className="mt-3 text-base font-black text-zinc-900 lg:mt-0">
+          <h3 className="mt-4 text-base font-black text-zinc-900 lg:mt-0">
             {this.editing
               ? `Edit activity #${f.activityId}`
               : "Create group-buy activity"}
@@ -1062,10 +1021,10 @@ export class AdminPage extends UiElement {
 
           {!this.editing && (
             <>
-              <h4 className="mt-5 text-xs font-black uppercase tracking-wider text-zinc-400">
-                Discount configuration
+              <h4 className="mt-6 border-t border-zinc-100 pt-4 text-[11px] font-black uppercase tracking-widest text-brand-500">
+                Discount
               </h4>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className={labelCls}>
                   Discount name *
                   <input
@@ -1129,9 +1088,6 @@ export class AdminPage extends UiElement {
                     }
                   />
                 </label>
-                <p className="col-span-2 -mt-1 text-[10px] text-zinc-400">
-                  {EXPR_HINTS[f.marketPlan]}
-                </p>
                 <label className={labelCls}>
                   Description
                   <input
@@ -1147,7 +1103,7 @@ export class AdminPage extends UiElement {
                   />
                 </label>
                 <label className={labelCls}>
-                  Crowd tag ID (optional)
+                  Crowd tag ID
                   <input
                     type="text"
                     className={inputCls}
@@ -1162,10 +1118,10 @@ export class AdminPage extends UiElement {
                 </label>
               </div>
 
-              <h4 className="mt-5 text-xs font-black uppercase tracking-wider text-zinc-400">
+              <h4 className="mt-6 border-t border-zinc-100 pt-4 text-[11px] font-black uppercase tracking-widest text-brand-500">
                 Goods (SKU)
               </h4>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className={labelCls}>
                   Goods ID *
                   <input
@@ -1241,27 +1197,19 @@ export class AdminPage extends UiElement {
             </>
           )}
 
-          {this.editing && (
-            <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-              Editing updates the activity fields only; the discount and goods
-              configuration stay untouched (the backend updates rows by
-              existence, which avoids accidental changes to shared data).
-            </p>
-          )}
-
-          <div className="sticky bottom-0 mt-6 flex gap-3 bg-white pt-2 pb-1">
+          <div className="sticky bottom-0 -mx-5 mt-6 flex gap-3 border-t border-zinc-100 bg-white/95 px-5 pb-1 pt-3 backdrop-blur lg:-mx-7 lg:px-7">
             <button
               onClick={() => {
                 this.formOpen = false;
               }}
-              className="flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-500 transition active:scale-[.98]"
+              className="pressable flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-500 hover:bg-zinc-50"
             >
               Cancel
             </button>
             <button
               onClick={() => void this.submitForm()}
               disabled={this.saving}
-              className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-orange-400 py-2.5 text-sm font-black text-white shadow-lg shadow-brand-500/30 transition active:scale-[.98] disabled:opacity-60"
+              className="pressable flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-orange-400 py-2.5 text-sm font-black text-white shadow-brand disabled:opacity-60"
             >
               {this.saving
                 ? "Saving…"

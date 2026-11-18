@@ -55,7 +55,7 @@ export interface MarketConfig {
   goods: Goods;
   teamList: Team[] | null;
   teamStatistic: TeamStatistic;
-  /** Optional field aligned with the legacy Java GoodsMarketResponseDTO; the gateway omits it today. */
+  /** Discount details when supplied by the gateway. */
   groupBuyActivityDiscountVO?: { groupBuyDiscount?: GroupBuyDiscount } | null;
 }
 
@@ -85,13 +85,13 @@ export function deriveDiscountExpr(goods: Goods): {
     return {
       plan: "ZJ",
       expr: `Direct deduction ¥${deduction.toFixed(2)}`,
-      note: `You pay ${pct}% of the list price`,
+      note: `Pay ${pct}%`,
     };
   }
   return {
     plan: "ZJ",
     expr: "Direct deduction ¥0.00",
-    note: "No extra discount",
+    note: "No discount",
   };
 }
 

@@ -9,10 +9,7 @@ export function randomNumeric(n = 12): string {
   return s;
 }
 
-/**
- * External trade number per attempt: 12 random digits — parity with the
- * legacy `generateRandomNumber(12)` used by lock_market_pay_order.
- */
+/** External trade number per attempt: 12 random digits. */
 export function newOutTradeNo(): string {
   return randomNumeric(12);
 }
